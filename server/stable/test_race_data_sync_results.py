@@ -433,6 +433,44 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.assertEqual(self.event.results.get().reported_finish_position, 2)
         self.assertEqual(self.event.results.get().running_status, 'dead_heat')
 
+    @override_settings(RACE_DATA_SYNC_ENABLED=True, RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+                       RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True)
+    def test_unpublished_legacy_partial_with_unknown_rows_can_be_promoted(self):
+        self._public_enrollment()
+        rows = self._rows()
+        rows[1].update(reported_finish_position=None, status='declared')
+        observation = self._observation(self.source, 'licensed_api', rows, result_phase='provisional')
+        shadow = apply_data_sync_result_observation(observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=False, correction_apply_enabled=False)
+        revision = models.RaceEventRevision.objects.get(pk=shadow.revision_id)
+        # 旧版暂定候选包含未知名次行；模拟真实升级前的不可变revision形状。
+        participant = models.RaceEventParticipant.objects.create(event=self.event,
+            stable_key='legacy-unknown', canonical_name='Beta', country_region='japan', review_status='approved')
+        models.RaceEventParticipantSourceIdentity.objects.create(source_identity=self.source,
+            external_runner_id='horse-2', participant=participant)
+        models.RaceEventRevisionItem.objects.create(revision=revision, participant=participant,
+            internal_order=2, source_order=2, status='declared', horse_number='2')
+        published = apply_data_sync_result_observation(observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(published.projected, published)
+        self.assertEqual(published.revision_id, shadow.revision_id)
+        self.assertEqual(self.event.results.count(), 1)
+        self.assertEqual(revision.items.count(), 2)  # 不重写旧审计证据。
+        path, _ = models.RaceEventPublicPath.objects.get_or_create(event=self.event, path_kind='canonical',
+            defaults={'year':2026, 'slug':self.event.slug})
+        from stable.services.public_probe_orm_loader import _materialize
+        snapshot = _materialize(self.event.pk, f'/races/{path.year}/{path.slug}/', NOW)
+        self.assertEqual(snapshot.status, 'read_boundary_loaded', snapshot)
+        self.assertEqual(len(snapshot.rows), 1)
+        self.assertFalse(snapshot.rows[0].is_confirmed)
+        rows[0]['finish_time'] = '1:30.0'
+        update = self._observation(self.source, 'licensed_api', rows, result_phase='provisional',
+                                   observed_at=NOW + timedelta(minutes=1))
+        advanced = apply_data_sync_result_observation(observation_id=update.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=False)
+        self.assertTrue(advanced.projected, advanced)
+        self.assertEqual(self.event.results.get().finish_time, '1:30.0')
+
     def test_same_facts_phase_upgrade_is_not_swallowed_by_replay(self):
         for phase in ("provisional", "official"):
             observation = self._observation(self.source, "licensed_api", self._rows(), result_phase=phase)

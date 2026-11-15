@@ -7,3 +7,6 @@
 - [x] (integration) 独立review两项P2真实RED、返修，98项隔离PG回归通过。
 - [ ] (operations) 同一reviewer复审与最终准确SHA的CI收据。
 - [ ] (operations) 固定树范围CI、独立review、Draft PR与精确发布包。
+
+- [x] (integration) 旧未发布暂定候选兼容反例与返修；117项隔离PG回归通过。
+- [ ] (operations) 最终兼容增量复审、准确候选CI与交付收据，完成前不合并部署。

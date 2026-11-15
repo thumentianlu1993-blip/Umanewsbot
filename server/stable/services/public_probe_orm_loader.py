@@ -147,6 +147,10 @@ def _materialize(event_id, canonical_subject, as_of):
         participant__event_id=event_id).values_list("external_runner_id", "participant_id")[:MAX_ROWS + 1])
     if any(len(x) > MAX_ROWS for x in (items, results, identities)):
         raise _TooLarge()
+    if revision.phase == m.RaceResultPhase.PROVISIONAL and gate.reason == "data_sync_public_read_allowed":
+        # 旧版未发表候选可能保留未知行；data-sync暂定投影仅公开明确结果行。
+        from .race_data_sync_results import _TERMINAL_RESULT_STATUSES
+        items = [item for item in items if item.status in _TERMINAL_RESULT_STATUSES]
     identity_map = dict(identities)
     item_map = {item.participant_id:item for item in items}
     if len(identity_map) != len(identities) or len(item_map) != len(items) or len(items) != len(results) or not items:

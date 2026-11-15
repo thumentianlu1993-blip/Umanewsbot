@@ -815,7 +815,7 @@ def apply_data_sync_result_observation(
                 "jockey_name": "jockey_name", "trainer_name": "trainer_name",
             }
             previous_source = current.primary_observation.source_identity
-            for item in current.items.all():
+            for item in current.items.filter(status__in=_TERMINAL_RESULT_STATUSES):
                 row = candidate_rows.get(item.participant_id)
                 if row is None or any(
                     getattr(item, old_field) and not row[new_field]
@@ -1006,7 +1006,8 @@ def apply_data_sync_result_observation(
             and existing.primary_observation_id == observation.pk
             and existing.phase == phase
             and existing.source_authority == candidate_source_class
-            and existing.items.count() == len(ordered_rows)
+            and (existing.items.filter(status__in=_TERMINAL_RESULT_STATUSES).count()
+                 if provisional else existing.items.count()) == len(ordered_rows)
         )
         if existing is not None and not promote_existing:
             if may_project and provenance.get('france_basic_v1'):
@@ -1207,9 +1208,10 @@ def apply_data_sync_result_observation(
         if projected:
             models.RaceEventResult.objects.filter(event=event).delete()
             legacy_results = []
-            for item, row in zip(
-                revision.items.order_by("internal_order"), ordered_rows, strict=True
-            ):
+            projection_items = revision.items.order_by("internal_order")
+            if provisional:
+                projection_items = projection_items.filter(status__in=_TERMINAL_RESULT_STATUSES)
+            for item, row in zip(projection_items, ordered_rows, strict=True):
                 legacy_results.append(
                     models.RaceEventResult(
                         event=event,
@@ -1229,6 +1231,7 @@ def apply_data_sync_result_observation(
                         is_confirmed=terminal_phase,
                         source_refs={
                             "source_key": source.source_key,
+                            "external_race_id": source.external_race_id,
                             "external_runner_id": row["external_runner_id"],
                             "revision_id": revision.pk,
                             **({"field_units": {"carried_weight": "kg", "margin": "length"}}

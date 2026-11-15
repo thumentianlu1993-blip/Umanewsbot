@@ -41,7 +41,7 @@
       "path": "docs/changes/partial-race-results/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "d96250121f781638b83ed00aa47b8588ee9aab402cd9e4e50a78b1d09340938c",
+      "after_hash": "d7ccc50629fc4c33da66d2c3320b3d27ba75ba99df23685f0e1727d2639b0e63",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -49,7 +49,7 @@
       "path": "docs/changes/partial-race-results/test_cases.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "ef47b365f096225c4c2e88deaeff69568dea7a8129d4f9b324ada3028054b1e8",
+      "after_hash": "8262932ffc6d758facd36daceb6027ab24d605167daa569c5654d5575a0475b6",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -70,6 +70,14 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/services/public_probe_orm_loader.py",
+      "status": "modified",
+      "before_hash": "369d285da6f72966b221ae0a4059147a76ae302600e22647c7b607cc9240dbbe",
+      "after_hash": "4388cfb9f4bd83dfeff03b361a622feb1849f31030dbc850ece826a72f49669b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/services/race_data_sync_admission.py",
       "status": "modified",
       "before_hash": "83826145ed56699cb9dc4c2738bffc4068b8dddfb3e418601ba8712255a3330b",
@@ -81,7 +89,7 @@
       "path": "server/stable/services/race_data_sync_results.py",
       "status": "modified",
       "before_hash": "89d97541d0518d33868ee7a70d86d6a8411f3ef0142142ecc1d8c511a1ced735",
-      "after_hash": "740025d991e88e83e6e4d29d038a73ccf98bc43661ca695bac828b6486a3de10",
+      "after_hash": "856c3b5406a452823b22ff71001359a214fc1ceac95423491b17b6f3c6f2a85a",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -113,7 +121,7 @@
       "path": "server/stable/test_race_data_sync_results.py",
       "status": "modified",
       "before_hash": "aff985f33f27f5eeac3d26e3235c78402f505ef225f56c68bde31757b3d53b35",
-      "after_hash": "bc7466f44dbdb2d72125f2666b97b994c0875b02c6d586349bb188b6aa935c77",
+      "after_hash": "27f590d0c5ca1b13f6b87905f0934ac2b07eb5147453f9eb03d9568cc6111556",
       "before_mode": "100644",
       "after_mode": "100644"
     },
