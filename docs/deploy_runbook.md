@@ -1,3 +1,7 @@
+## 2026-11-15 公开时间查询性能包维护入口
+
+PR #321 已发布，Web候选 `29f736b5` / 镜像 `sha256:ccf91e7dc06d9e105f73952099eafd399451f182e4e2579f25cfb5683e7811b1`；其余五应用仍为 `3f298404`。无迁移或业务数据动作。运行Web的25份完整Compose链在原23份之后追加 `/opt/umanews-external-staging/public-time-29f736b5/rollback-identity.json`、同目录 `release-identity.json`；最后一份固定新Web镜像与版本元数据。维护时以容器标签中的完整链为准。原镜像与私有配置恢复点保留，首轮自动回滚后同包重试成功，最终Web healthy、四路径200、锁释放。详见[发布证据](changes/public-time-query-performance/release_evidence.md)。
+
 ## 2026-11-14 日本采集后续包维护入口
 
 PR #313 merge `9db3f4ca`，四应用于北京时间 17:36:15 发布固定候选 `661d45ef`。schema0084，无迁移，3 GiB 磁盘阈值及 QQ 关闭保持。维护 Compose 链在采集恢复包链之后追加 `/opt/umanews-external-staging/japan-recovery-661d45ef/release-identity.json`；以运行容器的完整配置链为准。日本 126/204 仅提前 `next_poll_at`，两项原状态及配置备份保存在该目录的私有 `evidence/`。本包应用回滚目标为 `41d3f76c`，正常采集数据保留；未执行回滚。实际自然验收见 [线上证据](changes/collection-recovery-arc/release_evidence.md)。

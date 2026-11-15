@@ -1,3 +1,5 @@
+> 2026-11-15 20:28 已合并并发布；最终身份、首轮回滚及同包重试结果见[发布证据](release_evidence.md)。以下保留实现和交付准备时的历史记录。
+
 # 交付准备
 
 工作区 public-time-query-performance，分支 codex/public-time-query-performance，起点 633f80ce。仅本线程修改本工作区。已整合最新主线 67a97939。实现、370项固定树范围回归及独立只读review已完成，Draft PR #321 已建立；合并和发布尚未执行。
