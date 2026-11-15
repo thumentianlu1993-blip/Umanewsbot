@@ -1870,6 +1870,9 @@
     ],
     "server/stable/fixtures/p01_quality_boundaries_20261115.json": [
       "news_quality"
+    ],
+    "server/stable/fixtures/p01_stage_boundary_failures_20261115.json": [
+      "news_quality"
     ]
   },
   "symbols": {
