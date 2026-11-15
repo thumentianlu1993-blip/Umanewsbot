@@ -353,6 +353,60 @@ class FranceResultWorkflowTests(TestCase):
         self.assertTrue(url.startswith(self.base))
         return (ROOT/('avenir-result.html' if url.endswith('arrivee-rapports') else 'avenir-card.html')).read_text()
 
+    def test_partial_result_publishes_and_checkpoint_keeps_polling(self):
+        from unittest.mock import patch
+        from stable import models
+        from stable.services.race_data_source_adapters import fetch_bound_observation, run_multisource_claim
+        from stable.services.race_data_sync_enrollment import attach_multisource_observation
+        from stable.services.race_data_sync_control import claim_multisource_events
+        from stable.services.race_events import resolve_race_live_public_read, resolve_race_live_public_reads
+        value = fetch_bound_observation(event=self.event, route=self.policy.routes[0], now=NOW, fetcher=self.fetch)
+        attach_multisource_observation(value, policy=self.policy, now=NOW)
+        for index, row in enumerate(value['roster'], 1):
+            models.RaceEventRunner.objects.create(event=self.event, sort_order=index,
+                horse_number=row['number'], horse_name=row['horse_name'],
+                source_refs={'geny':row['external_runner_id']})
+        partial = copy.deepcopy(value)
+        partial['result_phase'] = 'provisional'
+        partial['roster_complete'] = False
+        for row in partial['roster']:
+            if row['reported_finish_position'] != 1:
+                row.update(reported_finish_position=None, status='declared', finish_time='', margin='')
+        winner = next(row for row in partial['roster'] if row['reported_finish_position'] == 1)
+        winner['field_provenance']['win_odds'] = '3.5'
+        claims = claim_multisource_events(event_ids=[self.event.pk], now=NOW, historical=True)
+        self.assertEqual(len(claims), 1)
+        with patch('stable.services.race_data_source_adapters.fetch_bound_observation', return_value=partial):
+            outcome = run_multisource_claim(claim=claims[0], now=NOW, fetcher=self.fetch)
+        self.assertFalse(outcome['processed'], outcome)
+        self.assertEqual(outcome['reason'], 'result_incomplete')
+        self.assertEqual(self.event.results.count(), 1)
+        self.assertFalse(self.event.results.get().is_confirmed)
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.result_confirmed_at)
+        decision = resolve_race_live_public_read(event_id=self.event.pk, now=NOW)
+        self.assertTrue(decision.visible, decision)
+        self.assertEqual(decision.phase, 'provisional')
+        self.assertEqual(resolve_race_live_public_reads(event_ids=[self.event.pk], now=NOW)[self.event.pk], decision)
+        checkpoint = models.RaceEventLiveProviderCheckpoint.objects.get(tracking__event=self.event, data_kind='result')
+        self.assertIsNotNone(checkpoint.next_poll_at)
+
+        # 第二次快照新增名次但缺少已公开赔率：保留上一版并继续补采。
+        from datetime import timedelta
+        next_partial = copy.deepcopy(value)
+        next_partial['result_phase'] = 'provisional'
+        next_partial['roster_complete'] = False
+        for row in next_partial['roster']:
+            row['field_provenance'].pop('win_odds', None)
+        later = checkpoint.next_poll_at + timedelta(seconds=1)
+        with patch('django.utils.timezone.now', return_value=later), patch(
+                'stable.services.race_data_source_adapters.fetch_bound_observation', return_value=next_partial):
+            claims = claim_multisource_events(event_ids=[self.event.pk], now=later, historical=True)
+            self.assertEqual(len(claims), 1)
+            run_multisource_claim(claim=claims[0], now=later, fetcher=self.fetch)
+        self.assertEqual(self.event.results.count(), 1)
+        self.assertEqual(self.event.results.get().odds_value, '3.5')
+
     def test_independent_card_result_binding_publication_and_replay(self):
         from stable.services.race_data_source_adapters import fetch_bound_observation,run_multisource_claim
         from stable.services.race_data_sync_enrollment import attach_multisource_observation

@@ -371,7 +371,197 @@ class RaceDataSyncResultApplicationTests(TestCase):
             },
         ]
 
-    def test_winner_only_finishes_without_publishing_or_confirming_complete_result(self):
+    @override_settings(RACE_DATA_SYNC_ENABLED=True,
+                       RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+                       RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True)
+    def test_partial_result_public_then_official_replaces_without_correction_flag(self):
+        self._public_enrollment()
+        partial = self._observation(self.source, "licensed_api", self._rows()[:1],
+                                    result_phase=models.RaceResultPhase.PROVISIONAL,
+                                    race_status="provisional")
+        decision = apply_data_sync_result_observation(
+            observation_id=partial.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(decision.projected, decision)
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.result_confirmed_at)
+        self.assertEqual(list(self.event.results.values_list("horse_name", "is_confirmed")), [("Alpha", False)])
+        public = race_events.resolve_race_live_public_read(event_id=self.event.pk, now=NOW)
+        self.assertTrue(public.visible, public)
+        self.assertEqual(public.phase, "provisional")
+        with patch("django.utils.timezone.now", return_value=NOW):
+            response = self.client.get(self.event.get_absolute_url())
+        self.assertContains(response, "暂定赛果，仍在补齐")
+        self.assertEqual(len(response.context["results"]), 1)
+        self.assertFalse(response.context["results"][0].is_confirmed)
+        self.assertEqual(race_events.resolve_race_live_public_reads(event_ids=[self.event.pk], now=NOW)[self.event.pk], public)
+        official = self._observation(self.source, "licensed_api", self._rows(), observed_at=NOW + timedelta(minutes=1))
+        decision = apply_data_sync_result_observation(
+            observation_id=official.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=False)
+        self.assertTrue(decision.projected, decision)
+        self.assertEqual(self.event.results.filter(is_confirmed=True).count(), 2)
+        self.assertEqual(self.event.results.count(), 2)
+        with patch("django.utils.timezone.now", return_value=NOW + timedelta(minutes=1)):
+            response = self.client.get(self.event.get_absolute_url())
+        self.assertNotContains(response, "暂定赛果，仍在补齐")
+        self.assertEqual(response.context["result_section_label"], "赛果")
+        self.assertEqual(len(response.context["results"]), 2)
+        delayed = self._observation(self.source, "licensed_api", self._rows()[:1],
+                                    result_phase=models.RaceResultPhase.PROVISIONAL,
+                                    observed_at=NOW + timedelta(minutes=2))
+        decision = apply_data_sync_result_observation(
+            observation_id=delayed.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=2), project_current=True, correction_apply_enabled=False)
+        self.assertEqual(decision.reason_code, "result_phase_regression")
+        self.assertEqual(self.event.results.filter(is_confirmed=True).count(), 2)
+
+    def test_partial_known_second_place_without_winner_does_not_finish(self):
+        rows = self._rows()
+        rows[0].update(reported_finish_position=None, status="declared")
+        observation = self._observation(self.source, "licensed_api", rows,
+                                        result_phase=models.RaceResultPhase.PROVISIONAL)
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(decision.projected, decision)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
+        self.assertEqual(list(self.event.results.values_list("horse_name", "reported_finish_position", "is_confirmed")), [("Beta", 2, False)])
+        revision = models.RaceEventRevision.objects.get(pk=decision.revision_id)
+        self.assertEqual(revision.items.count(), 1)
+        self.assertIsNone(revision.official_confirmed_at)
+
+    def test_partial_dead_heat_can_precede_the_other_tied_runner(self):
+        rows = self._rows()[1:]
+        rows[0]['status'] = 'dead_heat'
+        observation = self._observation(self.source, "licensed_api", rows, result_phase="provisional")
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(decision.projected, decision)
+        self.assertEqual(self.event.results.get().reported_finish_position, 2)
+        self.assertEqual(self.event.results.get().running_status, 'dead_heat')
+
+    @override_settings(RACE_DATA_SYNC_ENABLED=True, RACE_DATA_SYNC_RESULT_APPLY_ENABLED=True,
+                       RACE_DATA_SYNC_RESULT_PUBLIC_ENABLED=True)
+    def test_unpublished_legacy_partial_with_unknown_rows_can_be_promoted(self):
+        self._public_enrollment()
+        rows = self._rows()
+        rows[1].update(reported_finish_position=None, status='declared')
+        observation = self._observation(self.source, 'licensed_api', rows, result_phase='provisional')
+        shadow = apply_data_sync_result_observation(observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=False, correction_apply_enabled=False)
+        revision = models.RaceEventRevision.objects.get(pk=shadow.revision_id)
+        # 旧版暂定候选包含未知名次行；模拟真实升级前的不可变revision形状。
+        participant = models.RaceEventParticipant.objects.create(event=self.event,
+            stable_key='legacy-unknown', canonical_name='Beta', country_region='japan', review_status='approved')
+        models.RaceEventParticipantSourceIdentity.objects.create(source_identity=self.source,
+            external_runner_id='horse-2', participant=participant)
+        models.RaceEventRevisionItem.objects.create(revision=revision, participant=participant,
+            internal_order=2, source_order=2, status='declared', horse_number='2')
+        published = apply_data_sync_result_observation(observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(published.projected, published)
+        self.assertEqual(published.revision_id, shadow.revision_id)
+        self.assertEqual(self.event.results.count(), 1)
+        self.assertEqual(revision.items.count(), 2)  # 不重写旧审计证据。
+        path, _ = models.RaceEventPublicPath.objects.get_or_create(event=self.event, path_kind='canonical',
+            defaults={'year':2026, 'slug':self.event.slug})
+        from stable.services.public_probe_orm_loader import _materialize
+        snapshot = _materialize(self.event.pk, f'/races/{path.year}/{path.slug}/', NOW)
+        self.assertEqual(snapshot.status, 'read_boundary_loaded', snapshot)
+        self.assertEqual(len(snapshot.rows), 1)
+        self.assertFalse(snapshot.rows[0].is_confirmed)
+        rows[0]['finish_time'] = '1:30.0'
+        update = self._observation(self.source, 'licensed_api', rows, result_phase='provisional',
+                                   observed_at=NOW + timedelta(minutes=1))
+        advanced = apply_data_sync_result_observation(observation_id=update.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=False)
+        self.assertTrue(advanced.projected, advanced)
+        self.assertEqual(self.event.results.get().finish_time, '1:30.0')
+
+    def test_same_facts_phase_upgrade_is_not_swallowed_by_replay(self):
+        for phase in ("provisional", "official"):
+            observation = self._observation(self.source, "licensed_api", self._rows(), result_phase=phase)
+            decision = apply_data_sync_result_observation(
+                observation_id=observation.pk, expected_event_id=self.event.pk,
+                now=NOW, project_current=True, correction_apply_enabled=False)
+            self.assertTrue(decision.projected, decision)
+        self.assertEqual(self.event.results.filter(is_confirmed=True).count(), 2)
+        self.assertEqual(models.RaceEventRevision.objects.count(), 2)
+
+    def test_partial_identity_mismatch_does_not_publish(self):
+        rows = self._rows()[:1]
+        rows[0]["external_runner_id"] = "unrelated-horse"
+        observation = self._observation(self.source, "licensed_api", rows, result_phase="provisional")
+        decision = apply_data_sync_result_observation(
+            observation_id=observation.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertFalse(decision.projected)
+        self.assertFalse(self.event.results.exists())
+
+    def test_partial_refresh_compares_canonical_participants_across_sources(self):
+        fallback = self._source("jra", "official_operator", "fallback-result")
+        for runner in self.event.runners.all():
+            runner.source_refs['jra'] = 'jra-' + runner.external_runner_id
+            runner.save()
+        rows = self._rows()[:1]
+        rows[0]['external_runner_id'] = 'jra-horse-1'
+        first = self._observation(fallback, 'official_operator', rows, result_phase='provisional')
+        initial = apply_data_sync_result_observation(observation_id=first.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(initial.projected, initial)
+        participant = models.RaceEventRevision.objects.get(pk=initial.revision_id).items.get().participant_id
+        next_observation = self._observation(self.source, 'licensed_api', self._rows(),
+                                            result_phase='provisional', observed_at=NOW + timedelta(minutes=1))
+        decision = apply_data_sync_result_observation(observation_id=next_observation.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=False)
+        self.assertTrue(decision.projected, decision)
+        self.assertEqual(self.event.results.count(), 2)
+        self.assertEqual(models.RaceEventRevision.objects.get(pk=decision.revision_id).items.get(reported_finish_position=1).participant_id, participant)
+
+    def test_partial_refresh_cannot_erase_previously_known_popularity(self):
+        source = self._source("jra", "official_operator", "jra-result")
+        rows = self._rows()[:1]
+        rows[0]['field_provenance'] = {'source_fields': {'popularity': '2'}}
+        first = self._observation(source, 'official_operator', rows, result_phase='provisional')
+        initial = apply_data_sync_result_observation(observation_id=first.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(initial.projected, initial)
+        self.assertEqual(self.event.results.get().popularity, '2')
+        next_observation = self._observation(source, 'official_operator', self._rows(),
+                                            result_phase='provisional', observed_at=NOW + timedelta(minutes=1))
+        decision = apply_data_sync_result_observation(observation_id=next_observation.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=False)
+        self.assertEqual(decision.reason_code, 'provisional_result_regression')
+        self.assertEqual(self.event.results.get().popularity, '2')
+
+    def test_partial_refresh_cannot_erase_previously_known_time(self):
+        rows = self._rows()[:1]
+        rows[0]['finish_time'] = '1:30.0'
+        first = self._observation(self.source, 'licensed_api', rows, result_phase='provisional')
+        initial = apply_data_sync_result_observation(observation_id=first.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(initial.projected, initial)
+        next_observation = self._observation(self.source, 'licensed_api', self._rows(),
+                                            result_phase='provisional', observed_at=NOW + timedelta(minutes=1))
+        decision = apply_data_sync_result_observation(observation_id=next_observation.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=False)
+        self.assertEqual(decision.reason_code, 'provisional_result_regression')
+        self.assertEqual(self.event.results.get().finish_time, '1:30.0')
+
+    def test_partial_refresh_cannot_drop_existing_known_rows(self):
+        for rows, at in ((self._rows(), NOW), (self._rows()[:1], NOW + timedelta(minutes=1))):
+            observation = self._observation(self.source, "licensed_api", rows,
+                                            result_phase="provisional", observed_at=at)
+            decision = apply_data_sync_result_observation(
+                observation_id=observation.pk, expected_event_id=self.event.pk,
+                now=at, project_current=True, correction_apply_enabled=False)
+        self.assertEqual(decision.reason_code, "provisional_result_regression")
+        self.assertEqual(self.event.results.count(), 2)
+
+    def test_winner_only_publishes_provisional_without_confirming_complete_result(self):
         observation = self._observation(self.source, "licensed_api", self._rows()[:1],
                                         result_phase=models.RaceResultPhase.PROVISIONAL)
         apply_data_sync_result_observation(
@@ -382,8 +572,8 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.control.refresh_from_db()
         self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
         self.assertIsNone(self.event.result_confirmed_at)
-        self.assertIsNone(self.control.current_result_revision_id)
-        self.assertFalse(models.RaceEventResult.objects.exists())
+        self.assertIsNotNone(self.control.current_result_revision_id)
+        self.assertEqual(list(models.RaceEventResult.objects.values_list("is_confirmed", flat=True)), [False])
         self.assertTrue(models.RaceEventLifecycleTransition.objects.filter(
             event=self.event, reason_code="data_sync_winner_observed").exists())
         from stable.views import _with_winner_evidence, _public_race_status_label
@@ -1196,7 +1386,7 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.assertNotEqual(decision.reason_code, "")
         self.assertFalse(models.RaceEventResult.objects.exists())
 
-    def test_provisional_complete_roster_is_recorded_without_public_projection(self):
+    def test_provisional_complete_roster_is_public_without_confirmation(self):
         observation = self._observation(
             self.source,
             "licensed_api",
@@ -1213,15 +1403,15 @@ class RaceDataSyncResultApplicationTests(TestCase):
             correction_apply_enabled=True,
         )
 
-        self.assertEqual(decision.action, "recorded")
-        self.assertFalse(decision.projected)
-        self.assertFalse(models.RaceEventResult.objects.exists())
+        self.assertEqual(decision.action, "applied")
+        self.assertTrue(decision.projected)
+        self.assertEqual(models.RaceEventResult.objects.filter(is_confirmed=False).count(), 2)
         self.control.refresh_from_db()
         self.assertEqual(
             self.control.last_provisional_result_revision_id,
             decision.revision_id,
         )
-        self.assertIsNone(self.control.current_result_revision_id)
+        self.assertEqual(self.control.current_result_revision_id, decision.revision_id)
 
     def test_official_phase_without_registered_terminal_marker_is_rejected(self):
         observation = self._observation(

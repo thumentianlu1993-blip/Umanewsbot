@@ -431,7 +431,7 @@ def validate_multisource_publication(
         or publication.registry_digest != binding.get("route_digest")
         or publication.allowlist_version != 2
         or publication.reason != "data_sync_result"
-        or publication.authorization_kind != "official_route"
+        or publication.authorization_kind != ("provisional_policy" if revision.phase == "provisional" else "official_route")
         or publication.coverage_proof_digest != observation.normalized_sha256
         or revision.primary_observation_id != observation.pk
         or revision.event_id != event.pk

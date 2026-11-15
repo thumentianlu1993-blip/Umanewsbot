@@ -33,7 +33,8 @@
     "docs/changes/p01-annotation-driven-translation-20261114/*.json",
     "docs/changes/p01-main-integration-20261114/ci-scope.json",
     "docs/changes/race-priority-lifecycle-20261115/ci-scope.json",
-    "docs/changes/public-time-query-performance/ci-scope.json"
+    "docs/changes/public-time-query-performance/ci-scope.json",
+    "docs/changes/partial-race-results/ci-scope.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -2144,6 +2145,7 @@
     "docs/changes/p01-main-integration-20261114/ci-scope.json",
     "docs/changes/p04-1-race-name-matching/ci-scope.json",
     "docs/changes/race-priority-lifecycle-20261115/ci-scope.json",
-    "docs/changes/public-time-query-performance/ci-scope.json"
+    "docs/changes/public-time-query-performance/ci-scope.json",
+    "docs/changes/partial-race-results/ci-scope.json"
   ]
 }

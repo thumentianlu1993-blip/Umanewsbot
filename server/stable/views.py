@@ -4126,7 +4126,11 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         if hide_live_results
         else _attach_result_display_positions(list(event.results.all()))
     )
-    result_section_label = "赛果"
+    result_section_label = (
+        "暂定赛果，仍在补齐"
+        if live_public_read.visible and live_public_read.phase == "provisional"
+        else "赛果"
+    )
     history_winners = _series_history_winners(
         event,
         exclude_result_event_id=event.pk if hide_live_results else None,

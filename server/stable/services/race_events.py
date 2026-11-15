@@ -3310,12 +3310,18 @@ def _resolve_data_sync_publication_from_loaded_rows(
 
     if control.write_owner != RaceEventProjectionWriteOwner.DATA_SYNC:
         return reject("writer_owner_mismatch")
-    if revision.phase not in {RaceResultPhase.OFFICIAL, RaceResultPhase.CORRECTED}:
+    provisional = revision.phase == RaceResultPhase.PROVISIONAL
+    if revision.phase not in {RaceResultPhase.PROVISIONAL, RaceResultPhase.OFFICIAL, RaceResultPhase.CORRECTED}:
         return reject("phase_not_public")
-    if event.status != RaceEventStatus.FINISHED or not isinstance(
+    if not provisional and (event.status != RaceEventStatus.FINISHED or not isinstance(
         event.result_confirmed_at, datetime
-    ) or timezone.is_naive(event.result_confirmed_at):
+    ) or timezone.is_naive(event.result_confirmed_at)):
         return reject("event_not_confirmed")
+
+    if provisional and (event.status not in {RaceEventStatus.SCHEDULED, RaceEventStatus.RUNNING, RaceEventStatus.FINISHED}
+                        or event.result_confirmed_at is not None or revision.official_confirmed_at is not None):
+        return reject("provisional_state_invalid")
+    public_mode = RaceLivePublicationMode.PROVISIONAL_PUBLIC if provisional else RaceLivePublicationMode.OFFICIAL_PUBLIC
 
     if enrollment is not None and enrollment.authority_version==2:
         from stable.services.race_data_sync_admission import validate_multisource_publication
@@ -3323,7 +3329,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
             publication=publication,observation=observation,source=source,enrollment=enrollment)
         if reason:return reject(reason)
         return RaceLivePublicReadDecision(visible=True,reason="data_sync_public_read_allowed",
-            revision_id=revision.pk,phase=revision.phase,effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC)
+            revision_id=revision.pk,phase=revision.phase,effective_mode=public_mode)
 
     from stable.services.race_event_lifecycle_enforce import (
         validate_registry_membership_snapshot,
@@ -3469,7 +3475,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
         return reject("source_contract_drift")
     if (
         publication.reason != "data_sync_result"
-        or publication.authorization_kind != "official_route"
+        or publication.authorization_kind != ("provisional_policy" if provisional else "official_route")
         or publication.official_authorization_version != 0
         or publication.allowlist_version != 1
         or publication.registry_digest != route.registry_digest
@@ -3483,7 +3489,7 @@ def _resolve_data_sync_publication_from_loaded_rows(
         reason="data_sync_public_read_allowed",
         revision_id=revision.pk,
         phase=revision.phase,
-        effective_mode=RaceLivePublicationMode.OFFICIAL_PUBLIC,
+        effective_mode=public_mode,
     )
 
 
