@@ -1,0 +1,2005 @@
+{
+  "schema": "hkjc-name-reviews-v1",
+  "catalog_sha256": "57ecda1984a956075f7d9667a227395a13684b5e8984fc829507551feb82e3d6",
+  "decision_queue_sha256": "dfa25def3d1886fcaa4e90b9262dabce0c61e0a798221b126df48c70298a19c2",
+  "cases": [
+    {
+      "number": 1,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "按同名不同马分别保留各自HKJC译名；身份上下文不足时保留原名",
+      "user_instruction": "1–5 均按建议，继续下一批。第3组匹配时可以按生年/年龄匹配。",
+      "input_forms": [
+        "Abraham Lincoln"
+      ],
+      "groups": [
+        {
+          "target": "林肯总统",
+          "ids": [
+            "4c0340e717446e62edc9"
+          ],
+          "identity_group": "review:horse:022656600edc1f94",
+          "identity": {
+            "birth_year": 2004,
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "林肯号",
+          "ids": [
+            "8a704e61e4fb019f1d82"
+          ],
+          "identity_group": "review:horse:841ef7ed52cdf6b6",
+          "identity": {
+            "birth_year": 2024,
+            "sire": "Wootton Bassett (GB)",
+            "dam": "High Celebrity (FR)",
+            "country": "GB"
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "按同名不同马分别保留各自HKJC译名；身份上下文不足时保留原名",
+      "user_instruction": "1–5 均按建议，继续下一批。第3组匹配时可以按生年/年龄匹配。",
+      "input_forms": [
+        "Accredit"
+      ],
+      "groups": [
+        {
+          "target": "权威认可",
+          "ids": [
+            "16a41a691ef59064b3b2"
+          ],
+          "identity_group": "review:horse:9155ae685f5f392a",
+          "identity": {
+            "birth_year": 2023,
+            "sire": "Dubawi (IRE)",
+            "dam": "Entitle (GB)",
+            "country": "GB"
+          }
+        },
+        {
+          "target": "大奖赏",
+          "ids": [
+            "b759e2ee9e5302fb6006"
+          ],
+          "identity_group": "review:horse:52a3d542df7c24a7",
+          "identity": {
+            "birth_year": 2005,
+            "country": "USA"
+          }
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "按同名不同马分别保留各自HKJC译名；身份上下文不足时保留原名；用户明确允许依据生年或结合赛事日期的年龄匹配",
+      "user_instruction": "1–5 均按建议，继续下一批。第3组匹配时可以按生年/年龄匹配。",
+      "input_forms": [
+        "BIRDMAN",
+        "Birdman"
+      ],
+      "groups": [
+        {
+          "target": "飞天侠",
+          "ids": [
+            "15eedf11cb8488102cad"
+          ],
+          "identity_group": "review:horse:10c043daafdaee2d",
+          "identity": {
+            "birth_year": 2010,
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "天鸟侠义",
+          "ids": [
+            "7920f7d3e0e1f1b4bfcb"
+          ],
+          "identity_group": "review:horse:54ee21575b4f50ac",
+          "identity": {
+            "birth_year": 2021,
+            "sire": "Free Eagle (IRE)",
+            "dam": "Carol (IRE)",
+            "country": "IRE"
+          }
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "按同名不同马分别保留各自HKJC译名；身份上下文不足时保留原名",
+      "user_instruction": "1–5 均按建议，继续下一批。第3组匹配时可以按生年/年龄匹配。",
+      "input_forms": [
+        "CRYSTAL BLACK",
+        "Crystal Black"
+      ],
+      "groups": [
+        {
+          "target": "黑水晶",
+          "ids": [
+            "5fc929663bb0c24e9910"
+          ],
+          "identity_group": "review:horse:b9c5c38fe12d0f0c",
+          "identity": {
+            "birth_year": 2017,
+            "sire": "Kizuna (JPN)",
+            "dam": "Ash Cake (JPN)",
+            "country": "JPN"
+          }
+        },
+        {
+          "target": "黑晶莹",
+          "ids": [
+            "dfb3f60809af826a1cab"
+          ],
+          "identity_group": "review:horse:6f113e3b112dd030",
+          "identity": {
+            "birth_year": 2018,
+            "sire": "Teofilo (IRE)",
+            "dam": "She's Our Mark (GB)",
+            "country": "IRE"
+          }
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "按同名不同马分别保留各自HKJC译名；身份上下文不足时保留原名",
+      "user_instruction": "1–5 均按建议，继续下一批。第3组匹配时可以按生年/年龄匹配。",
+      "input_forms": [
+        "Cliffs Of Moher"
+      ],
+      "groups": [
+        {
+          "target": "莫赫悬崖",
+          "ids": [
+            "a9dfba73509d5cfef780"
+          ],
+          "identity_group": "review:horse:585e4cee07b69d1e",
+          "identity": {
+            "birth_year": 2014,
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "望洋峭壁",
+          "ids": [
+            "dea61e952d3f62e25db4"
+          ],
+          "identity_group": "review:horse:0bba42955bcd7941",
+          "identity": {
+            "birth_year": 2021,
+            "sire": "Holy Roman Emperor (IRE)",
+            "dam": "Corail (IRE)",
+            "country": "FR"
+          }
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马；分别保留各自HKJC译名，结合产地和生年/年龄等身份信息匹配",
+      "user_instruction": "6–10 均按建议。HKJC给出的中文名是繁体，实际展示统一改为简体。",
+      "input_forms": [
+        "Darkness Falls",
+        "Darkness Falls (IRE)"
+      ],
+      "groups": [
+        {
+          "target": "夜影合上",
+          "ids": [
+            "1a34bd6fcf00db231331"
+          ],
+          "identity_group": "review:horse:2bfe7c7f2dec0aee",
+          "identity": {
+            "birth_year": 2024,
+            "sire": "Camelot (GB)",
+            "dam": "You'resobeautiful (IRE)",
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "夜幕降临",
+          "ids": [
+            "4364f42dd30a73c8c82b"
+          ],
+          "identity_group": "review:horse:7cc63c1eab84f098",
+          "identity": {
+            "birth_year": 2015,
+            "country": "USA"
+          }
+        }
+      ]
+    },
+    {
+      "number": 7,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马；分别保留各自HKJC译名，结合产地和生年/年龄等身份信息匹配",
+      "user_instruction": "6–10 均按建议。HKJC给出的中文名是繁体，实际展示统一改为简体。",
+      "input_forms": [
+        "Double Up"
+      ],
+      "groups": [
+        {
+          "target": "两倍落力",
+          "ids": [
+            "b45b04acc3a64ea13cfb"
+          ],
+          "identity_group": "review:horse:5e939691dd95486e",
+          "identity": {
+            "birth_year": 2022,
+            "sire": "City Light (FR)",
+            "dam": "Rolling Stone (IRE)",
+            "country": "FR"
+          }
+        },
+        {
+          "target": "倍加利",
+          "ids": [
+            "dca66997830ef35a88c3"
+          ],
+          "identity_group": "review:horse:2c3ecee35aa2d16f",
+          "identity": {
+            "birth_year": 2011,
+            "country": "GB"
+          }
+        }
+      ]
+    },
+    {
+      "number": 8,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马；分别保留各自HKJC译名，结合产地和生年/年龄等身份信息匹配",
+      "user_instruction": "6–10 均按建议。HKJC给出的中文名是繁体，实际展示统一改为简体。",
+      "input_forms": [
+        "Englishman"
+      ],
+      "groups": [
+        {
+          "target": "英国绅士",
+          "ids": [
+            "4f7be30eb0f688003e02"
+          ],
+          "identity_group": "review:horse:dd2607c310e708b6",
+          "identity": {
+            "birth_year": 2010,
+            "country": "GB"
+          }
+        },
+        {
+          "target": "英伦公子",
+          "ids": [
+            "9c3bbee11c85e80688dd"
+          ],
+          "identity_group": "review:horse:0cd7d246ab894d51",
+          "identity": {
+            "birth_year": 2023,
+            "sire": "Maxfield (USA)",
+            "dam": "In It for the Gold (USA)",
+            "country": "USA"
+          }
+        }
+      ]
+    },
+    {
+      "number": 9,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同一匹马的中文字形归一；晚禱和晩禱统一显示晚祷，保留两种官方来源原文",
+      "user_instruction": "6–10 均按建议。HKJC给出的中文名是繁体，实际展示统一改为简体。",
+      "input_forms": [
+        "Even Song"
+      ],
+      "groups": [
+        {
+          "target": "晚祷",
+          "ids": [
+            "2f756a6ac173f8b933bf",
+            "7625945d08620811beb2"
+          ],
+          "identity_group": "review:horse:213fe068fe24db5b",
+          "identity": {
+            "birth_year": 2013,
+            "country": "IRE"
+          },
+          "remove_aliases": [
+            "晩祷",
+            "晩禱"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 10,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马；分别保留各自HKJC译名，结合产地和生年/年龄等身份信息匹配",
+      "user_instruction": "6–10 均按建议。HKJC给出的中文名是繁体，实际展示统一改为简体。",
+      "input_forms": [
+        "Fandom"
+      ],
+      "groups": [
+        {
+          "target": "拥戴者众",
+          "ids": [
+            "71f1561b1a5d3ad1fff4"
+          ],
+          "identity_group": "review:horse:3a945f872d3b2eb2",
+          "identity": {
+            "birth_year": 2021,
+            "sire": "Showcasing (GB)",
+            "dam": "Brogan (GB)",
+            "country": "GB"
+          }
+        },
+        {
+          "target": "忠实拥趸",
+          "ids": [
+            "7d96a731ff29fc12a65a"
+          ],
+          "identity_group": "review:horse:afc5b6b21129dde3",
+          "identity": {
+            "birth_year": 2022,
+            "sire": "Saturnalia (JPN)",
+            "dam": "Fanatic (JPN)",
+            "country": "JPN"
+          }
+        }
+      ]
+    },
+    {
+      "number": 11,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄等身份信息匹配",
+      "user_instruction": "11–15 均按建议，继续下一批。之后每一批15条。",
+      "input_forms": [
+        "Fire Fly",
+        "Fire Fly (FR)"
+      ],
+      "groups": [
+        {
+          "target": "流萤飞转",
+          "ids": [
+            "19a7295ce42e3f282098"
+          ],
+          "identity_group": "review:horse:6ee7ad861f3e3ae8",
+          "identity": {
+            "birth_year": 2016,
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "流萤飞",
+          "ids": [
+            "df061c117a05ac6b6c16"
+          ],
+          "identity_group": "review:horse:c6c68abed44351bd",
+          "identity": {
+            "birth_year": 2023,
+            "sire": "Golden Horde (IRE)",
+            "dam": "Whipcorse (FR)",
+            "country": "FR"
+          }
+        }
+      ]
+    },
+    {
+      "number": 12,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名同龄不同马；必须结合产地或血统，不能只按生年/年龄匹配",
+      "user_instruction": "11–15 均按建议，继续下一批。之后每一批15条。",
+      "input_forms": [
+        "Griselda"
+      ],
+      "groups": [
+        {
+          "target": "厉害女霸",
+          "ids": [
+            "1f00994f1478a36a1b15"
+          ],
+          "identity_group": "review:horse:3d62d2e9adf113d7",
+          "identity": {
+            "birth_year": 2022,
+            "sire": "Kodi Bear (IRE)",
+            "dam": "Geizy Teizy (IRE)",
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "霸气女枭",
+          "ids": [
+            "66bcaa55e285dd35168e"
+          ],
+          "identity_group": "review:horse:dcd6270a3e3a8595",
+          "identity": {
+            "birth_year": 2022,
+            "sire": "City Light (FR)",
+            "dam": "Narcisca (GB)",
+            "country": "FR"
+          }
+        }
+      ]
+    },
+    {
+      "number": 13,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄等身份信息匹配",
+      "user_instruction": "11–15 均按建议，继续下一批。之后每一批15条。",
+      "input_forms": [
+        "HOPEFUL",
+        "Hopeful"
+      ],
+      "groups": [
+        {
+          "target": "乐观",
+          "ids": [
+            "27626a64fe1044720f75"
+          ],
+          "identity_group": "review:horse:482697de1fa675fc",
+          "identity": {
+            "birth_year": 2020,
+            "sire": "Make Believe (GB)",
+            "dam": "Moon Mountain (GB)",
+            "country": "GB"
+          }
+        },
+        {
+          "target": "满希望",
+          "ids": [
+            "3c22e55659927e04277c"
+          ],
+          "identity_group": "review:horse:73d31288cff63c1b",
+          "identity": {
+            "birth_year": 2017,
+            "sire": "Motivator (GB)",
+            "dam": "Monst (IRE)",
+            "country": "FR"
+          }
+        }
+      ]
+    },
+    {
+      "number": 14,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄等身份信息匹配",
+      "user_instruction": "11–15 均按建议，继续下一批。之后每一批15条。",
+      "input_forms": [
+        "Humidor"
+      ],
+      "groups": [
+        {
+          "target": "妥保存",
+          "ids": [
+            "0a0dbacdbfba55726c63"
+          ],
+          "identity_group": "review:horse:4554fc9c68a039ed",
+          "identity": {
+            "birth_year": 2016,
+            "sire": "Orfevre (JPN)",
+            "dam": "Avec Toi (JPN)",
+            "country": "JPN"
+          }
+        },
+        {
+          "target": "雪茄盒",
+          "ids": [
+            "296e22954424b95672ba"
+          ],
+          "identity_group": "review:horse:2b36f13e62e7ceef",
+          "identity": {
+            "birth_year": 2007,
+            "country": "IRE"
+          }
+        }
+      ]
+    },
+    {
+      "number": 15,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄等身份信息匹配",
+      "user_instruction": "11–15 均按建议，继续下一批。之后每一批15条。",
+      "input_forms": [
+        "Johannes"
+      ],
+      "groups": [
+        {
+          "target": "约翰尼斯",
+          "ids": [
+            "01e9c6fd8cf54d6f0d91"
+          ],
+          "identity_group": "review:horse:3b91db6716e37058",
+          "identity": {
+            "birth_year": 2003,
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "约翰领先",
+          "ids": [
+            "9c3f8160fc44713664a7"
+          ],
+          "identity_group": "review:horse:144a5118ba18d98d",
+          "identity": {
+            "birth_year": 2020,
+            "sire": "Nyquist (USA)",
+            "dam": "Cuyathy (USA)",
+            "country": "USA"
+          }
+        }
+      ]
+    },
+    {
+      "number": 16,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名同生年不同马；日本马按日文名、产地或父California Chrome区分，爱尔兰马父Camelot；不得仅按生年匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "LOS ANGELES",
+        "Los Angeles"
+      ],
+      "groups": [
+        {
+          "target": "洛杉矶",
+          "ids": [
+            "4919eeafb081891e8cc3"
+          ],
+          "identity_group": "review:horse:d3225fac165d7d97",
+          "identity": {
+            "birth_year": 2021,
+            "sire": "California Chrome (USA)",
+            "dam": "Ichiryu (JPN)",
+            "country": "JPN"
+          }
+        },
+        {
+          "target": "南加名城",
+          "ids": [
+            "5034f967318abb4dc008"
+          ],
+          "identity_group": "review:horse:3d0884753509e7a7",
+          "identity": {
+            "birth_year": 2021,
+            "sire": "Camelot (GB)",
+            "dam": "Frequential (GB)",
+            "country": "IRE"
+          }
+        }
+      ]
+    },
+    {
+      "number": 17,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "爱尔兰两条中世紀记录归同一名称对照，日本中世代独立；不因雄马后变阉马拆分名称",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Medieval"
+      ],
+      "groups": [
+        {
+          "target": "中世纪",
+          "ids": [
+            "9eddd92ea25b9e4fc8fb",
+            "cb3b58657010d6939314"
+          ],
+          "identity_group": "review:horse:cd63538829c63056",
+          "identity": {
+            "birth_year": 2014,
+            "sire": "Kodiac (GB)",
+            "dam": "Quickstyx (GB)",
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "中世代",
+          "ids": [
+            "d23d8ca71d82503fad4a"
+          ],
+          "identity_group": "review:horse:23f4f75ce5b92c87",
+          "identity": {
+            "birth_year": 2018,
+            "sire": "Asia Express (USA)",
+            "dam": "Medjerda (JPN)",
+            "country": "JPN"
+          }
+        }
+      ]
+    },
+    {
+      "number": 18,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Moonlight"
+      ],
+      "groups": [
+        {
+          "target": "月色如银",
+          "ids": [
+            "59cf34123fb9fc2911bc"
+          ],
+          "identity_group": "review:horse:c56311436a2f33f2",
+          "identity": {
+            "birth_year": 2021,
+            "sire": "Audible (USA)",
+            "dam": "Sundown (USA)",
+            "country": "USA"
+          }
+        },
+        {
+          "target": "月辉",
+          "ids": [
+            "a0ed07c880b3f04fa565"
+          ],
+          "identity_group": "review:horse:4503392c5b4ae798",
+          "identity": {
+            "birth_year": 2017,
+            "sire": "Heart's Cry (JPN)",
+            "dam": "Be Wind (JPN)",
+            "country": "JPN"
+          }
+        }
+      ]
+    },
+    {
+      "number": 19,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Poker"
+      ],
+      "groups": [
+        {
+          "target": "扑克牌",
+          "ids": [
+            "095cb545afde3348bb85"
+          ],
+          "identity_group": "review:horse:f123fa191d8ea8e2",
+          "identity": {
+            "birth_year": 2023,
+            "sire": "Wootton Bassett (GB)",
+            "dam": "Park Bloom (IRE)",
+            "country": "IRE"
+          }
+        },
+        {
+          "target": "攻心扑克",
+          "ids": [
+            "df1eec86d91a6cdd349b"
+          ],
+          "identity_group": "review:horse:e0997c96310b0b4b",
+          "identity": {
+            "birth_year": 2019,
+            "sire": "Real Impact (JPN)",
+            "dam": "Silver Chalice (IRE)",
+            "country": "JPN"
+          }
+        }
+      ]
+    },
+    {
+      "number": 20,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "QUINAULT",
+        "Quinault"
+      ],
+      "groups": [
+        {
+          "target": "才情横溢",
+          "ids": [
+            "4228edc0ba67956fcddf"
+          ],
+          "identity_group": "review:horse:56fc96a156f8d726",
+          "identity": {
+            "birth_year": 2020,
+            "sire": "Oasis Dream (GB)",
+            "dam": "Queimada (GER)",
+            "country": "GER"
+          }
+        },
+        {
+          "target": "自然林区",
+          "ids": [
+            "9f1e14bfc44f7ac49df1"
+          ],
+          "identity_group": "review:horse:3a8e56bd3cef3ba4",
+          "identity": {
+            "birth_year": 2023,
+            "sire": "Chrysoberyl (JPN)",
+            "dam": "Washington Legacy (JPN)",
+            "country": "JPN"
+          }
+        }
+      ]
+    },
+    {
+      "number": 21,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "RADIANT"
+      ],
+      "groups": [
+        {
+          "target": "光彩迸发",
+          "ids": [
+            "2be83b0b592a89cabdc2"
+          ],
+          "identity_group": "review:horse:76e4290ce0f6286e",
+          "identity": {
+            "birth_year": 2023,
+            "sire": "City Light (FR)",
+            "dam": "Robanne (GB)",
+            "country": "FR"
+          }
+        },
+        {
+          "target": "荧荧发亮",
+          "ids": [
+            "73e3ed25a5deeb7345dd"
+          ],
+          "identity_group": "review:horse:b0f3a61c7fe2371a",
+          "identity": {
+            "birth_year": 2016,
+            "sire": "Espoir City (JPN)",
+            "dam": "Grand Sorciere (USA)",
+            "country": "JPN"
+          }
+        }
+      ]
+    },
+    {
+      "number": 22,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Sacred"
+      ],
+      "groups": [
+        {
+          "target": "洁圣",
+          "ids": [
+            "91df3e90a718d1693f24"
+          ],
+          "identity_group": "review:horse:ff68f5841913597b",
+          "identity": {
+            "birth_year": 2019,
+            "sire": "American Patriot (USA)",
+            "dam": "Ken Amatsukaze (JPN)",
+            "country": "JPN"
+          }
+        },
+        {
+          "target": "圣驹",
+          "ids": [
+            "c57f724448aa000d36f1"
+          ],
+          "identity_group": "review:horse:dcad940aee929de3",
+          "identity": {
+            "birth_year": 2018,
+            "sire": "Exceed And Excel (AUS)",
+            "dam": "Sacre Caroline (USA)",
+            "country": "GB"
+          }
+        }
+      ]
+    },
+    {
+      "number": 23,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Salt Lake City"
+      ],
+      "groups": [
+        {
+          "target": "盐湖城",
+          "ids": [
+            "0ea5241097e131253e56"
+          ],
+          "identity_group": "review:horse:d1ceb2f5dba801b6",
+          "identity": {
+            "birth_year": 2015,
+            "sire": "Holy Roman Emperor (IRE)",
+            "dam": "Fleur de Sel (GB)",
+            "country": "FR"
+          }
+        },
+        {
+          "target": "盐湖都会",
+          "ids": [
+            "9f1d6610a4b95dace7bb"
+          ],
+          "identity_group": "review:horse:b98b32b1d25290af",
+          "identity": {
+            "birth_year": 2020,
+            "sire": "Galileo (IRE)",
+            "dam": "Heartache (GB)",
+            "country": "IRE"
+          }
+        }
+      ]
+    },
+    {
+      "number": 24,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "September"
+      ],
+      "groups": [
+        {
+          "target": "菊开月",
+          "ids": [
+            "4a0691602a3c77d360a4"
+          ],
+          "identity_group": "review:horse:985434c82b5ff38d",
+          "identity": {
+            "birth_year": 2019,
+            "sire": "Duramente (JPN)",
+            "dam": "Bella Luna (JPN)",
+            "country": "JPN"
+          }
+        },
+        {
+          "target": "九月天",
+          "ids": [
+            "a2fc8f890229a84bf38a"
+          ],
+          "identity_group": "review:horse:9bcb497a332653cb",
+          "identity": {
+            "birth_year": 2015,
+            "country": "IRE"
+          }
+        }
+      ]
+    },
+    {
+      "number": 25,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "爱尔兰两条银色魅幻记录归同一名称对照，保留各次证据；日本银魅姬独立",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Silver Ghost"
+      ],
+      "groups": [
+        {
+          "target": "银魅姬",
+          "ids": [
+            "0e88cc1de1f281497792"
+          ],
+          "identity_group": "review:horse:8d3a8e6a6f26486b",
+          "identity": {
+            "birth_year": 2020,
+            "sire": "Toby's Corner (USA)",
+            "dam": "Anne (JPN)",
+            "country": "JPN"
+          }
+        },
+        {
+          "target": "银色魅幻",
+          "ids": [
+            "25d241d0665fe9f55f4f",
+            "f3dd9315029f42961c8d"
+          ],
+          "identity_group": "review:horse:b2a72d09e4458e24",
+          "identity": {
+            "birth_year": 2022,
+            "sire": "Phoenix Of Spain (IRE)",
+            "dam": "Kykuit (IRE)",
+            "country": "IRE"
+          }
+        }
+      ]
+    },
+    {
+      "number": 26,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Tawny Port"
+      ],
+      "groups": [
+        {
+          "target": "金黄波特",
+          "ids": [
+            "4a3a72656c11d6e0b7c2"
+          ],
+          "identity_group": "review:horse:01c58b9200e31d1d",
+          "identity": {
+            "birth_year": 2014,
+            "country": "GB"
+          }
+        },
+        {
+          "target": "金色波特",
+          "ids": [
+            "f2acdb39b93c6ef6620c"
+          ],
+          "identity_group": "review:horse:eab1ece6f4a8f4c9",
+          "identity": {
+            "birth_year": 2019,
+            "sire": "Pioneerof the Nile (USA)",
+            "dam": "Livi Makenzie (USA)",
+            "country": "USA"
+          }
+        }
+      ]
+    },
+    {
+      "number": 27,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "Tropical Storm"
+      ],
+      "groups": [
+        {
+          "target": "热带气旋",
+          "ids": [
+            "5fc85311fee8c45e46ca"
+          ],
+          "identity_group": "review:horse:9f176bd82182eecd",
+          "identity": {
+            "birth_year": 2022,
+            "sire": "Eqtidaar (IRE)",
+            "dam": "Avon Breeze (GB)",
+            "country": "GB"
+          }
+        },
+        {
+          "target": "卷风暴",
+          "ids": [
+            "a589a005218320a417c3"
+          ],
+          "identity_group": "review:horse:3661905642dceba6",
+          "identity": {
+            "birth_year": 2013,
+            "sire": "Harbinger (GB)",
+            "dam": "Seaside Breeze (JPN)",
+            "country": "JPN"
+          }
+        }
+      ]
+    },
+    {
+      "number": 28,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "同名不同马，分别保留译名；结合产地、生年/年龄或血统等身份信息匹配",
+      "user_instruction": "16确认是不同的马，分别保留。17–28也均按建议。",
+      "input_forms": [
+        "VALPOLICELLA"
+      ],
+      "groups": [
+        {
+          "target": "葡萄酒区",
+          "ids": [
+            "2a51e77c93b0d12a8d34"
+          ],
+          "identity_group": "review:horse:3a35a97aedf3acb5",
+          "identity": {
+            "birth_year": 2019,
+            "sire": "Amaron (GB)",
+            "dam": "Very Nice (GER)",
+            "country": "GER"
+          }
+        },
+        {
+          "target": "北意美酒",
+          "ids": [
+            "d2e16cb98f9028b40717"
+          ],
+          "identity_group": "review:horse:934e69dafcf78184",
+          "identity": {
+            "birth_year": 2018,
+            "sire": "Tamayuz (GB)",
+            "dam": "Comfort In Sound (USA)",
+            "country": "GB"
+          }
+        }
+      ]
+    },
+    {
+      "number": 29,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "名称对照仅保留荣进快蹄，不将另一旧译名作为名称别名；原始来源证据保留",
+      "user_instruction": "29、30 只保留荣进快蹄和真机伶两个译名。",
+      "input_forms": [
+        "エーシンフォワード"
+      ],
+      "groups": [
+        {
+          "target": "荣进快蹄",
+          "ids": [
+            "45b25c299b5f816825a7",
+            "63411b1fd1d1e8ae754e"
+          ],
+          "identity_group": "review:horse:3363d8db9b8c966a",
+          "identity": {
+            "birth_year": 2005,
+            "country": "USA"
+          },
+          "remove_aliases": [
+            "捷足先得"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 30,
+      "kind": "horse",
+      "status": "approved",
+      "decision": "名称对照仅保留真机伶，不将另一旧译名作为名称别名；原始来源证据保留",
+      "user_instruction": "29、30 只保留荣进快蹄和真机伶两个译名。",
+      "input_forms": [
+        "カレンチャン"
+      ],
+      "groups": [
+        {
+          "target": "真机伶",
+          "ids": [
+            "011c66c3dc7eec4b3695",
+            "5dc612c791a13cd28677"
+          ],
+          "identity_group": "review:horse:02c51152f7432ba1",
+          "identity": {
+            "birth_year": 2007,
+            "country": "JPN"
+          },
+          "remove_aliases": [
+            "真机灵",
+            "真機靈"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 31,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Edward/Eddie/E Ahern按同人名称写法关联，中文仅使用较后赛卡的艾向能；艾向伦不作展示译名",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "E Ahern"
+      ],
+      "groups": [
+        {
+          "target": "艾向能",
+          "ids": [
+            "23c9ebbabb687897da99",
+            "52c00c88e4cd69f6d0b2",
+            "69300cb64e1fcc32b6f6"
+          ],
+          "identity_group": "review:jockey:7a59d8cfd1607ee9",
+          "remove_aliases": [
+            "艾向伦",
+            "艾向倫"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 32,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Feargal/Fergal/F Lynch按同人姓名拼写变体关联，统一连捷",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "F Lynch"
+      ],
+      "groups": [
+        {
+          "target": "连捷",
+          "ids": [
+            "836d01ba291ad8847e1f",
+            "a4f3b8c37c0d6cf24e2c"
+          ],
+          "identity_group": "review:jockey:e3189a651b82d14f",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 33,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "James Doyle为杜俊诚，Joe Doyle为杜若尧，分别保留；J Doyle须用同场坐骑/来源身份等信息区分，信息不足保留缩写",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "J Doyle"
+      ],
+      "groups": [
+        {
+          "target": "杜俊诚",
+          "ids": [
+            "6218b102799d5645c036",
+            "e6d2f5cf4672b214f7e7"
+          ],
+          "identity_group": "review:jockey:febf46e1f128a420"
+        },
+        {
+          "target": "杜若尧",
+          "ids": [
+            "657b9e99e9b7653a6edb"
+          ],
+          "identity_group": "review:jockey:acb775a529b9df7b"
+        }
+      ]
+    },
+    {
+      "number": 34,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Johnny/John/John-Patrick/J P/J Murtagh按同人姓名写法关联，统一莫狄",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "J Murtagh"
+      ],
+      "groups": [
+        {
+          "target": "莫狄",
+          "ids": [
+            "0946e2e6c1df63ea603e",
+            "2fc27ae1a6a26d6fbd40",
+            "976ce885e3a3f08d63b0",
+            "af0ffa7d5a0802660a67",
+            "cb897fab38494048a1e2"
+          ],
+          "identity_group": "review:jockey:f993e37237b7f7ba",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 35,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "本组Jamie/James/J Spencer及Spencer J.按已采集的官方姓名对照关联，统一史宾沙",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "J Spencer",
+        "Spencer J."
+      ],
+      "groups": [
+        {
+          "target": "史宾沙",
+          "ids": [
+            "0011b8ebcb9300217237",
+            "0a4ea4bbc60881a36522",
+            "0a5593a0a9c5eaa0e4d7",
+            "d3d84ebb65e254a6c778"
+          ],
+          "identity_group": "review:jockey:5cb44bc4e867f4c4",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 36,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "本组骑手Joseph/J O’Brien及姓在前写法归一，中文仅保留岳本贤，欧本贤不作展示译名",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "O'brien J."
+      ],
+      "groups": [
+        {
+          "target": "岳本贤",
+          "ids": [
+            "33f4d1a6dfffb0e6fca8",
+            "8efabffe6e66c5d265cc",
+            "d28b9f4fb6700f6528d6"
+          ],
+          "identity_group": "review:jockey:e5096a1b36e77114",
+          "remove_aliases": [
+            "欧本贤",
+            "歐本賢"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 37,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Pat/Patrick/P Cosgrave归一，统一郭善佳",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "P Cosgrave"
+      ],
+      "groups": [
+        {
+          "target": "郭善佳",
+          "ids": [
+            "98708e44bf3688c1fd5e",
+            "ab15137bcb1bc004ceeb",
+            "e76ac1b73d583275dc4d"
+          ],
+          "identity_group": "review:jockey:a94a2dd34bc1d31e",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 38,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Paddy/Patrick/P Mathers归一，统一麦丰成",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "P Mathers"
+      ],
+      "groups": [
+        {
+          "target": "麦丰成",
+          "ids": [
+            "0132ae32bb002ed7d043",
+            "0d749aee6222309fb000",
+            "783901a46b8feb44d661"
+          ],
+          "identity_group": "review:jockey:0a21be376967260b",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 39,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Tony/T Piccone及姓在前写法归一，中文仅保留较后赛卡的彭国年，卜国年不作展示译名",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "Piccone T.",
+        "T Piccone",
+        "T. Piccone",
+        "Tony Piccone"
+      ],
+      "groups": [
+        {
+          "target": "彭国年",
+          "ids": [
+            "5f850c4e1160ee87d284",
+            "98b95898067550a96226"
+          ],
+          "identity_group": "review:jockey:64740deb25796dcd",
+          "remove_aliases": [
+            "卜国年",
+            "卜國年"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 40,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Ryan/Ryan-Lee/R L/R Moore及日文写法归一，统一莫雅",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "R Moore",
+        "R. Moore"
+      ],
+      "groups": [
+        {
+          "target": "莫雅",
+          "ids": [
+            "0e56bd5db2e3b6d7e886",
+            "55dcbc293c94a2374168",
+            "753b3fcad9a971f50a9f",
+            "b43f788d70344327405b",
+            "ef95f3e14c0dcb024186"
+          ],
+          "identity_group": "review:jockey:64aaffac27bd47f7",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 41,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Takafumi Hattori为服部茂史，Toshiki Hattori为服部寿希，分别保留；T Hattori须用同场坐骑/来源身份等信息区分，信息不足保留缩写",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "T Hattori"
+      ],
+      "groups": [
+        {
+          "target": "服部茂史",
+          "ids": [
+            "d6ecba8a3344cb164d95"
+          ],
+          "identity_group": "review:jockey:32eebf7ca3d819c1"
+        },
+        {
+          "target": "服部寿希",
+          "ids": [
+            "e875694ffa8598e1fd29"
+          ],
+          "identity_group": "review:jockey:64fe803ad4c185c3"
+        }
+      ]
+    },
+    {
+      "number": 42,
+      "kind": "jockey",
+      "status": "approved",
+      "decision": "Zac/Zachary/Z Purton及日文写法归一，统一潘顿",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "Z Purton"
+      ],
+      "groups": [
+        {
+          "target": "潘顿",
+          "ids": [
+            "182e9f5a85e529d6c4ab",
+            "6fee3fe8f77ac2faebf4",
+            "c42acbda70b1b8068c45",
+            "dff6b425c05555b84537"
+          ],
+          "identity_group": "review:jockey:779864a597fe8ffb",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 43,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Stephane/Stephan Cerulis及Cerulis S.归一，统一薛立新",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "Cerulis S."
+      ],
+      "groups": [
+        {
+          "target": "薛立新",
+          "ids": [
+            "c646c414580f23074ad5",
+            "e81f2351f5bc2897ada3"
+          ],
+          "identity_group": "review:trainer:bb27305134acd99e",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 44,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Ed/Edward/E Walker归一，统一韦嘉",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "E Walker",
+        "E. Walker"
+      ],
+      "groups": [
+        {
+          "target": "韦嘉",
+          "ids": [
+            "1e83401136a575272c80",
+            "96546cb601959bb3fc8a",
+            "aa3e8efd84e9992f9e10"
+          ],
+          "identity_group": "review:trainer:a7c961b1cbf330ed",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 45,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Freddy/Frederic/F Head及日文写法归一，统一赫德",
+      "user_instruction": "31–45 均按建议，继续下一批。",
+      "input_forms": [
+        "F Head"
+      ],
+      "groups": [
+        {
+          "target": "赫德",
+          "ids": [
+            "110fc4213d8d27b8be18",
+            "166cf7365f31305c5708",
+            "8e55daef44227c5dc3b9",
+            "f2f7af9cdd107c7132c8"
+          ],
+          "identity_group": "review:trainer:540f04cbc96a69c8",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 46,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Hedy/Hedi Ghabri及H Ghabri、姓在前写法按本组对照归一为贾秉义",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "Ghabri H.",
+        "H. Ghabri"
+      ],
+      "groups": [
+        {
+          "target": "贾秉义",
+          "ids": [
+            "90befc6266dac1bb5e6e",
+            "ba1421cde805b870cf7c"
+          ],
+          "identity_group": "review:trainer:7dd2dd2f00485f30",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 47,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Hughie/Hugh/H Morrison及姓在前写法归一为莫礼善",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "H Morrison",
+        "Morrison H."
+      ],
+      "groups": [
+        {
+          "target": "莫礼善",
+          "ids": [
+            "133cfb6427562d1c171a",
+            "4d09b513413786e576fc",
+            "b693206947eacb3df9ad"
+          ],
+          "identity_group": "review:trainer:3c4fab4aec7d71b7",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 48,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Jo/Joanna/J Hughes归一为夏卓诗",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "J Hughes"
+      ],
+      "groups": [
+        {
+          "target": "夏卓诗",
+          "ids": [
+            "0d9ad554846754e2a425",
+            "44dbb465068d87fa1470",
+            "e58b509ef42fe9d0120e"
+          ],
+          "identity_group": "review:trainer:225f33a2153c3a8a",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 49,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "James Moore（本库写法）对应施丹摩亚，John Moore对应约翰摩亚，分别保留；J Moore需同场坐骑/马房等上下文，不能只按缩写选人",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "J Moore"
+      ],
+      "groups": [
+        {
+          "target": "施丹摩亚",
+          "ids": [
+            "0ecb7a53f9fe4a122bb9"
+          ],
+          "identity_group": "review:trainer:19ed284415529642"
+        },
+        {
+          "target": "约翰摩亚",
+          "ids": [
+            "42cd88fd8ea1ac79fb19",
+            "a24f87fbcae1e4dd5adb"
+          ],
+          "identity_group": "review:trainer:ce191a5b52141663"
+        }
+      ]
+    },
+    {
+      "number": 50,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Joan/J Scott按本组记录归一，中文仅保留较后记录薛芷欣，不保留薜芷欣作为译名",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "J Scott"
+      ],
+      "groups": [
+        {
+          "target": "薛芷欣",
+          "ids": [
+            "bbfc6d74411c6c6b477f",
+            "c5a92d0a49130206055e"
+          ],
+          "identity_group": "review:trainer:1027c1e382c84a62",
+          "remove_aliases": [
+            "薜芷欣"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 51,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "同一联合练马师组合，中文仅保留昆约翰及昆树安；保留John & Sean Quinn英文组合，不与John Quinn单人合并",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "John & Sean Quinn"
+      ],
+      "groups": [
+        {
+          "target": "昆约翰及昆树安",
+          "ids": [
+            "3b9291a5a43a72978eb1",
+            "b68871e21db9e2bab56b"
+          ],
+          "identity_group": "review:trainer:ec1bcf85515d9722",
+          "remove_aliases": [
+            "昆約翰與昆樹安",
+            "昆约翰与昆树安"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 52,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Satoshi Kobayashi对应小林智，Shinya Kobayashi对应小林真也；缩写S Kobayashi信息不足时保留原文",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "Kobayashi S.",
+        "S. Kobayashi"
+      ],
+      "groups": [
+        {
+          "target": "小林智",
+          "ids": [
+            "245a8a7ee5e74e2b6b3c"
+          ],
+          "identity_group": "review:trainer:a40fbc7f3e7b755e"
+        },
+        {
+          "target": "小林真也",
+          "ids": [
+            "f7c6f38ae68dd321ac53"
+          ],
+          "identity_group": "review:trainer:aecd277c915f3243"
+        }
+      ]
+    },
+    {
+      "number": 53,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Masahiro Matsunaga对应松永昌博，Mikio Matsunaga对应松永干夫；M Matsunaga须结合上下文区分",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "M Matsunaga"
+      ],
+      "groups": [
+        {
+          "target": "松永昌博",
+          "ids": [
+            "013ece116e8c3f92f87b",
+            "69791693d5a2b286255c"
+          ],
+          "identity_group": "review:trainer:72af53b0acbf3ca1"
+        },
+        {
+          "target": "松永干夫",
+          "ids": [
+            "552e40ec903428e997dd",
+            "989952e6a274e2a81ec9"
+          ],
+          "identity_group": "review:trainer:624c0c4d7f7ba724"
+        }
+      ]
+    },
+    {
+      "number": 54,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Mitsuru Ishibashi对应石桥满，Mamoru Ishibashi对应石桥守；M Ishibashi须结合上下文区分",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "M. Ishibashi"
+      ],
+      "groups": [
+        {
+          "target": "石桥满",
+          "ids": [
+            "2b613c04f0817208e10c"
+          ],
+          "identity_group": "review:trainer:3b0ba615d7be9df4"
+        },
+        {
+          "target": "石桥守",
+          "ids": [
+            "f2d213a974fe3818abbe"
+          ],
+          "identity_group": "review:trainer:8c7b3b74d282ae49"
+        }
+      ]
+    },
+    {
+      "number": 55,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Elais/Elias Mikhalides及姓在前写法按本组对照归一为麦启令",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "Mikhalides E."
+      ],
+      "groups": [
+        {
+          "target": "麦启令",
+          "ids": [
+            "466f9b719f89dc847c01",
+            "9fb3d17fcc01829159c3"
+          ],
+          "identity_group": "review:trainer:e972dcb433a686d2",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 56,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Danny O’Brien对应欧伯贤，Donnacha O’Brien对应岳品贤，不合并；D O’Brien须结合身份/同场资料区分",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "O'brien D."
+      ],
+      "groups": [
+        {
+          "target": "欧伯贤",
+          "ids": [
+            "267404592f95247350a6"
+          ],
+          "identity_group": "review:trainer:aa4f0dc04e5dbc60"
+        },
+        {
+          "target": "岳品贤",
+          "ids": [
+            "a9b1d84549cbed61efd6"
+          ],
+          "identity_group": "review:trainer:9f5bfaedc38205f0"
+        }
+      ]
+    },
+    {
+      "number": 57,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Richard Hannon父子同名；父亲向能，儿子向礼伦，分别保留，R Hannon结合赛事日期及当时训练身份消歧，不能全局替换",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "R Hannon"
+      ],
+      "groups": [
+        {
+          "target": "向礼伦",
+          "ids": [
+            "393d68d2f25b5441563a"
+          ],
+          "identity_group": "review:trainer:b66a3bdc0ad59ccb",
+          "active_years": [
+            2014,
+            null
+          ],
+          "date_basis": "https://corporate.hkjc.com/image/201711/20171128_HKIRFormGuideCh.pdf"
+        },
+        {
+          "target": "向能",
+          "ids": [
+            "4aacac298a4cc51f49d1",
+            "68c347e34d24ec9f0887",
+            "c134aab7fddf333e7173"
+          ],
+          "identity_group": "review:trainer:9eca40f81d2387ca",
+          "active_years": [
+            null,
+            2013
+          ],
+          "date_basis": "https://corporate.hkjc.com/image/201711/20171128_HKIRFormGuideCh.pdf"
+        }
+      ]
+    },
+    {
+      "number": 58,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "与57同一父子重名问题；Richard Hannon全名也不唯一，父向能、子向礼伦分别保留",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "Richard Hannon"
+      ],
+      "groups": [
+        {
+          "target": "向礼伦",
+          "ids": [
+            "393d68d2f25b5441563a"
+          ],
+          "identity_group": "review:trainer:b66a3bdc0ad59ccb",
+          "active_years": [
+            2014,
+            null
+          ],
+          "date_basis": "https://corporate.hkjc.com/image/201711/20171128_HKIRFormGuideCh.pdf"
+        },
+        {
+          "target": "向能",
+          "ids": [
+            "4aacac298a4cc51f49d1",
+            "c134aab7fddf333e7173"
+          ],
+          "identity_group": "review:trainer:9eca40f81d2387ca",
+          "active_years": [
+            null,
+            2013
+          ],
+          "date_basis": "https://corporate.hkjc.com/image/201711/20171128_HKIRFormGuideCh.pdf"
+        }
+      ]
+    },
+    {
+      "number": 59,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Francois/Francoise/F Rohaut及姓在前写法按本组对照归一为卢汉德",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "Rohaut F."
+      ],
+      "groups": [
+        {
+          "target": "卢汉德",
+          "ids": [
+            "0a3b90c0fcccdc6cebcf",
+            "2bd8761ba3d8e23ccc2e",
+            "f5a6ff0a5db0ae9c42a2"
+          ],
+          "identity_group": "review:trainer:59e2e4fbd3c57316",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 60,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Hisashi Shimizu对应清水久词，Hiroo Shimizu对应清水裕夫，Hidekatsu Shimizu对应清水英克；H Shimizu须结合上下文，不凭举办地区硬选",
+      "user_instruction": "46–60 均按建议，继续最后5条。",
+      "input_forms": [
+        "Shimizu H."
+      ],
+      "groups": [
+        {
+          "target": "清水久词",
+          "ids": [
+            "58f73d9b4a25dd7061fb",
+            "ebc13db1d573da845363"
+          ],
+          "identity_group": "review:trainer:3f50f248d5967749"
+        },
+        {
+          "target": "清水裕夫",
+          "ids": [
+            "e1f22b7b5268cdb62c85"
+          ],
+          "identity_group": "review:trainer:13eb6c17603fd10e"
+        },
+        {
+          "target": "清水英克",
+          "ids": [
+            "ed364629a8e9cc3f2676",
+            "f0181936878d08cdcc0f"
+          ],
+          "identity_group": "review:trainer:9b6832807598044a"
+        }
+      ]
+    },
+    {
+      "number": 61,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Yutaka/Yoshihiro/Yoshiyasu/Yoshitada/Yasuyuki Takahashi分别对应高桥裕/高桥义博/高桥祥泰/高桥义忠/高桥康之，五人分别保留；Y Takahashi信息不足时保留缩写",
+      "user_instruction": "61–65 均按建议。接下来按全部审阅结果更新名称匹配，再跑一轮看看效果。",
+      "input_forms": [
+        "Y Takahashi"
+      ],
+      "groups": [
+        {
+          "target": "高桥裕",
+          "ids": [
+            "1173bef8eccb9a601589"
+          ],
+          "identity_group": "review:trainer:5799f40f68cdf033"
+        },
+        {
+          "target": "高桥义博",
+          "ids": [
+            "54e826cf360a4702c3f3"
+          ],
+          "identity_group": "review:trainer:67e76ada9ee4a3fb"
+        },
+        {
+          "target": "高桥祥泰",
+          "ids": [
+            "8c49036868045637f3ec"
+          ],
+          "identity_group": "review:trainer:15654905c9e28b39"
+        },
+        {
+          "target": "高桥义忠",
+          "ids": [
+            "c6b4d16a26936241fde5"
+          ],
+          "identity_group": "review:trainer:3da7994b062a6761"
+        },
+        {
+          "target": "高桥康之",
+          "ids": [
+            "c71496a3e27f187f2556"
+          ],
+          "identity_group": "review:trainer:9bec2881b988c1d3"
+        }
+      ]
+    },
+    {
+      "number": 62,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Masanori Ito与伊藤正徳等本组写法关联，同一人中文仅显示伊藤正德；原日文保留为原名别名",
+      "user_instruction": "61–65 均按建议。接下来按全部审阅结果更新名称匹配，再跑一轮看看效果。",
+      "input_forms": [
+        "伊藤 正徳",
+        "伊藤正徳"
+      ],
+      "groups": [
+        {
+          "target": "伊藤正德",
+          "ids": [
+            "2daf29263f69bab0b531",
+            "630fa541c7c5a09cf7b6",
+            "da0a8b1894ddeca451fd"
+          ],
+          "identity_group": "review:trainer:7aeb2629ff8dc14a",
+          "remove_aliases": []
+        }
+      ]
+    },
+    {
+      "number": 63,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Makoto Saito与斎藤誠为同人，本组中文齐藤诚/斋藤诚仅保留较后官方写法斋藤诚；不把齐与斋作为通用繁简转换规则",
+      "user_instruction": "61–65 均按建议。接下来按全部审阅结果更新名称匹配，再跑一轮看看效果。",
+      "input_forms": [
+        "斎藤 誠",
+        "斎藤誠"
+      ],
+      "groups": [
+        {
+          "target": "斋藤诚",
+          "ids": [
+            "7010367e3ef9374c8fda",
+            "a89f3d5ee68d11e7f0af"
+          ],
+          "identity_group": "review:trainer:6bd0359bb8797d77",
+          "remove_aliases": [
+            "齊藤誠",
+            "齐藤诚"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 64,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Takanori Kikuzawa与菊沢隆徳等本组写法关联，同一人中文仅显示菊泽隆德；原日文保留",
+      "user_instruction": "61–65 均按建议。接下来按全部审阅结果更新名称匹配，再跑一轮看看效果。",
+      "input_forms": [
+        "菊沢 隆徳",
+        "菊沢隆徳"
+      ],
+      "groups": [
+        {
+          "target": "菊泽隆德",
+          "ids": [
+            "131f036304602a55e915",
+            "3a1043ccefea86d46cf8"
+          ],
+          "identity_group": "review:trainer:51f52c24bf895e76",
+          "remove_aliases": [
+            "菊泽隆徳",
+            "菊澤隆徳"
+          ]
+        }
+      ]
+    },
+    {
+      "number": 65,
+      "kind": "trainer",
+      "status": "approved",
+      "decision": "Ippo/I Sameshima与鮫島一歩等本组写法关联，同一人中文仅显示鲛岛一步；原日文保留",
+      "user_instruction": "61–65 均按建议。接下来按全部审阅结果更新名称匹配，再跑一轮看看效果。",
+      "input_forms": [
+        "鮫島 一歩",
+        "鮫島一歩"
+      ],
+      "groups": [
+        {
+          "target": "鲛岛一步",
+          "ids": [
+            "2ac74529335e644b03a4",
+            "c3853ae342e9e80c07cc",
+            "c9eb173706c5ebdd0ef6"
+          ],
+          "identity_group": "review:trainer:97238216410d242e",
+          "remove_aliases": [
+            "鲛岛一歩"
+          ]
+        }
+      ]
+    }
+  ]
+}
