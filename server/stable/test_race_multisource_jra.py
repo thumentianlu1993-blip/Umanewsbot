@@ -97,6 +97,25 @@ class JraColdStartTests(TestCase):
             enabled_data_kinds=("result",),
         )[0]
 
+    def _assert_selector_priority(self, *, failures, expected_queue, expected_priority):
+        from stable.tasks import select_due_race_data_sync_task
+        self.enroll()
+        tracking = self.event.live_tracking
+        tracking.consecutive_failures = failures
+        tracking.save(update_fields=("consecutive_failures",))
+        with patch("stable.tasks.sync_race_event_provider_task.apply_async") as dispatch, \
+                self.captureOnCommitCallbacks(execute=True):
+            result = select_due_race_data_sync_task()
+        self.assertEqual(result["dispatched"], 1)
+        self.assertEqual(dispatch.call_args.kwargs["queue"], expected_queue)
+        self.assertEqual(dispatch.call_args.kwargs["priority"], expected_priority)
+
+    def test_selector_sends_new_result_with_lower_message_priority(self):
+        self._assert_selector_priority(failures=0, expected_queue="race_realtime", expected_priority=3)
+
+    def test_selector_sends_retry_with_high_message_priority(self):
+        self._assert_selector_priority(failures=1, expected_queue="race_realtime_retry", expected_priority=0)
+
     def test_cold_start_result_only_full_chain(self):
         self.enroll()
         self.assertEqual(models.RaceEventIdentityKey.objects.count(), 1)

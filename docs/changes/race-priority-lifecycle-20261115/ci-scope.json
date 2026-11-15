@@ -32,7 +32,7 @@
       "path": "deploy/release_0078.py",
       "status": "modified",
       "before_hash": "d6fc19799a62959abae72fbcb47ce06d0c92d8b87a5c6c090ca58d1658a22910",
-      "after_hash": "c3d514e6b45e8dc60686139a0b0e826df5d69d071c577660954961c41ebca119",
+      "after_hash": "63478f441486ca4eb291ddfe7b5e9d3a103b06a4546d5ed40ba4dc382dc66ad9",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -40,7 +40,7 @@
       "path": "deploy/release_0079.py",
       "status": "modified",
       "before_hash": "6e27d52bd5e0d3959268e297fc3efa4bf086c2c58749acbc3d3f3fc0430e63ec",
-      "after_hash": "a1e9a565981627a542b0f546a7e7a40010d851f05ecd995cf6861bde2349871a",
+      "after_hash": "86793e00fc501025ecb22f254b08647f8640254a3c8f8b3fff0e9cf1cada0f72",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -88,7 +88,7 @@
       "path": "docs/changes/race-priority-lifecycle-20261115/design.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "f22f02265ffec1ced551f995d60b8ac4dde4ff8a7b198dce1cbe32c890b0f378",
+      "after_hash": "f09557c0852bfaf4ae49677106cf6564f9cbdb1424312a7216a27d566687b46e",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -104,7 +104,7 @@
       "path": "docs/changes/race-priority-lifecycle-20261115/rollout.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "125acc2be59b5adcb570aaf6ebc56ef748f53ba7d5f0599630e8f33a6238916a",
+      "after_hash": "d837401c9e5a4c70935b9a80813d1e7ea82e07c01c403b48753fe6867cd7780d",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -120,7 +120,7 @@
       "path": "docs/changes/race-priority-lifecycle-20261115/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "c53511c1cdbba8a8cc509705fa45818b20a7340b423a6e842c30cc2d809c80c9",
+      "after_hash": "8e990b27022736f5acc72f9525589f59e896982f712474610629ddfc632753a6",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -133,10 +133,34 @@
       "after_mode": "100644"
     },
     {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "61dcfbc3d9b579d07199480ff3cb8889902b9adab7f836417e70da32b8cd5ffc",
+      "after_hash": "e56b8717faa56a8d6b1399e8b4ba88d5a05974510fb5f726e48e62fe3717f79f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "c19129f582d944df4f7f2b976271a4c5baa27a29a028d9fbb46efba0b0b0b8c5",
+      "after_hash": "1cbc5364e91369d274731cb269048f2255a6544f266bf0787b145bdabde4d939",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "runtime/snapshots/567bb4c72f1e4139916ff550b97efdaea517acbfc4bab3e94dcdcc8152f8d8de-5b161d3dded84351677e69dc964d295c58f6f9986684e9165c397975c0400266.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "5b161d3dded84351677e69dc964d295c58f6f9986684e9165c397975c0400266",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "server/app/settings.py",
       "status": "modified",
       "before_hash": "652a287780d9f784456793b847600cdca98753436e074f918ee55d29d4d0737d",
-      "after_hash": "c76e2e0e1ceda102c4db18782c9d4d12adb8e2a1a72aa93abc25a87339817008",
+      "after_hash": "92aa95c1c07f3c2a91bf012a70a5c9629b947d704fe40faba3ec831475d6f8d9",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -160,7 +184,7 @@
       "path": "server/stable/services/race_data_sync_control.py",
       "status": "modified",
       "before_hash": "eb0752edbe3c463dfa8577e5232d2debdd47ee6fdf9f583e13d7e48b473ecc6b",
-      "after_hash": "c91eaa4ec6aed1f2092a5a87f3babb39b60c457242b74f87d1dcf87d3d9ad7b1",
+      "after_hash": "a8b0a45941505e6ca8ae6fd6fddcd044dfc7588e229e2d183278eab5e37ae256",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -184,7 +208,7 @@
       "path": "server/stable/services/race_data_sync_results.py",
       "status": "modified",
       "before_hash": "95ae07f1f59fa78d909aef08951d4eccace15d089ec72573f7b73eb23cb7b1ea",
-      "after_hash": "7f37b7f74cb1e74b541edbdad93ad23ef5563f7784a74b15d0c4f2eb446a3186",
+      "after_hash": "89d97541d0518d33868ee7a70d86d6a8411f3ef0142142ecc1d8c511a1ced735",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -200,8 +224,16 @@
       "path": "server/stable/services/race_priority.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "6d9513d3bb75a4e728482ebf29fb8b55af21137cead612a2852b315cafff3dd3",
+      "after_hash": "043bdf222840a8a22ab8c02e9e0730a54b3800632d31a6e9227087860e25fc7c",
       "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_result_recovery_inventory.py",
+      "status": "modified",
+      "before_hash": "ab188bf46b497a2a8fc5534dbe7a54bd8296b5c4eb9548d4c6bd85ef872e6ec6",
+      "after_hash": "5e464880a4fb049efb74e92d7c79a76de6a02b84840586950d77638b1d3aea8c",
+      "before_mode": "100644",
       "after_mode": "100644"
     },
     {
@@ -248,7 +280,15 @@
       "path": "server/stable/tasks.py",
       "status": "modified",
       "before_hash": "58ca82102359b560fe5255afb45f1d853a6d3052e6f9a0ea951cdcd83ce7b2a8",
-      "after_hash": "00934ce3fedcfa4cd803b38787609d1e7a1d887e02ea0826f4eda49af0ea7af4",
+      "after_hash": "5556b08d1348e23a6baa5aa81545cfa98297fe8016d511b21258440e9699a310",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_chain_e2e.py",
+      "status": "modified",
+      "before_hash": "d196e3a91f91f491a1a34b1e84e98d8e5cd88fcb7f851803781ba233048b25ac",
+      "after_hash": "ae321d1e4c58638dd926f03cc7228d6928a340da2857d3f5f5c5c8417416489e",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -277,6 +317,14 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/test_race_data_sync_result_admission.py",
+      "status": "modified",
+      "before_hash": "c174044b36f2c2e61609271a34fb0164645bcd647aee700239a9c512fd59117c",
+      "after_hash": "f5410b1d88dc66caa5868aa9b5dab8ef483f34eb10b5b0bae863ed1cdf195c20",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/test_race_data_sync_results.py",
       "status": "modified",
       "before_hash": "ae55e14e835f1cd75ee7d78b1936b71fada86f25833414ff307c307dda3f9adb",
@@ -293,10 +341,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/test_race_multisource_enrollment.py",
+      "status": "modified",
+      "before_hash": "bb8bf94fb5f58e7b5cc72bfc7f2553bd79bcd49e23c5ed60705c0e343a45adaf",
+      "after_hash": "436bee344958c99017e443bd77c7593ecdddc5a5a17522bf166e44e50b1ae740",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/test_race_multisource_jra.py",
       "status": "modified",
       "before_hash": "6f26f0d1b0a453633e697741f083b0b546a2424b678b64638842b2921bcd9e98",
-      "after_hash": "18c55c8aaef83a44c3e17eb978a5b97ee3a179bb4a860f852ade69c7df6b623a",
+      "after_hash": "777098926c8cb7d28172bb7659dc24c5e4dbb58bdf98e564605ee4f324deb13b",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -304,7 +360,7 @@
       "path": "server/stable/test_race_priority_lifecycle.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "6bc9e0ae7bb8bf9e9dbc3a5081d96befb95b02684ec0b3af63b7f9481433896d",
+      "after_hash": "3d49ef164699e468074b11d8341cb591aa071c501a38e11ac9020853a502a3d7",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -312,7 +368,7 @@
       "path": "server/stable/test_release_0078_entrypoints.py",
       "status": "modified",
       "before_hash": "34a59fa884fb72b811bf7cc2d807cb2cf3f31615ad0507e12285944098fa7bf8",
-      "after_hash": "9566740b8d077560d1ccdfc9db90a172439616972eeeb0c9aa237b953cce66d5",
+      "after_hash": "49aafa091cb7d92e0051c378cd3869f1751dfb1da2816cd29123bc6d725f4e90",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -325,10 +381,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/test_release_0078_recovery_postgres.py",
+      "status": "modified",
+      "before_hash": "956653818b2cec3bd12d43eda0f3394d5a221c28e0fa2417fa92bec0f4ec0532",
+      "after_hash": "e26dcf024e8e56a198004c216eb59d76e1195ceb3b9889f56cd7e30be965ec7c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/test_single_migration_owner.py",
       "status": "modified",
       "before_hash": "54f5d490d127ae196c7ab4584bba94a39bc964051350a219c73d51b2ce66aec3",
-      "after_hash": "c5a740477aafdf342c0c5a273ed9d51db7ae9e9f9bda142d2685cb9c139f7509",
+      "after_hash": "6aae675d440d5effa69f767eb03e77e0495ef65b6c2d69b92262a1ecabdc6b46",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -341,10 +405,18 @@
       "after_mode": "100644"
     },
     {
+      "path": "server/stable/test_uk_workflow.py",
+      "status": "modified",
+      "before_hash": "aeeeafb926fc846883a455c314b00c716915a7d4460ac06866da36b8a819694f",
+      "after_hash": "370e071ed43cb8726a0dce70afbff6d51e1815c5b162e3ed2154538cd729de40",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
       "path": "server/stable/tests_legacy.py",
       "status": "modified",
       "before_hash": "20d44c0613b585dbe722b456eb2e4d036fdf79690df5f51e4533b3d33241f093",
-      "after_hash": "4f64d4035ec143b750404e97ba002c51a0cb45d40c41a7958d65c86d0a00d17b",
+      "after_hash": "799085c408c29e9213bf61328901ffda9fc7df4918ceab7e3ff00b4c687e2a3d",
       "before_mode": "100644",
       "after_mode": "100644"
     },

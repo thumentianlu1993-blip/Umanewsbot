@@ -7,9 +7,11 @@
 ## 调度与资源
 
 - `race_control` 承接 due selector、状态扫描/推进、结果 SLO；一分钟一轮。与新闻及广域发现分开。
-- 未确认结果 claim 分派至 `race_realtime`；失败后通过检查点重新领取有效 claim，投递 `race_realtime_retry`。同一实时 worker 优先消费重试队列，单并发、单预取，不重放过期 token。
+- 未确认结果 claim 分派至 `race_realtime`；失败后通过检查点重新领取有效 claim，投递 `race_realtime_retry`。同一实时 worker 使用 Redis 消息优先级（重试 0、普通 3）优先消费重试，单并发、单预取，不重放过期 token。
 - 新增 control/realtime 两个独立容器，各 384 MiB 限额，CPU 上限分别 0.25/0.5，CPU shares 2048；保留原后台 `race_sync_v2_worker`。完整继承赛事 worker 的环境和数据挂载，生产覆盖配置须同样扩展到两个新服务。
 - selector 优先选择最近一天未确认赛果，避免旧检查点占满批次；失败一分钟重试，显式拒绝保持一小时退避，来源 Retry-After 取较晚时点。
+- 0078/0079 正常在线升级在冻结 manifest 时将两个新增 worker 作为目标启动服务，并在 Beat 前启动；手工停服 release 保持停服意图。
+- 历史缺赛果盘点保留独立的时间到期判断，不再依赖“可以自动完赛”；不会据此写入赛事状态。
 - 删除周日 netkeiba 两条 rush 计划，保留小时与排行榜计划。旧消息参数仍兼容，避免发布时已在队列的消息反序列化失败。
 
 ## 请求预算

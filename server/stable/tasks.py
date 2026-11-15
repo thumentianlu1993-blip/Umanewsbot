@@ -476,7 +476,7 @@ def select_due_race_data_sync_task() -> dict:
         enabled_data_kinds=enabled_data_kinds,
     )
     from stable import models
-    from stable.services.race_priority import claim_queue
+    from stable.services.race_priority import claim_queue, claim_priority
     events = models.RaceEvent.objects.select_related("live_tracking").in_bulk(
         [claim.event_id for claim in claims])
     for claim in claims:
@@ -494,9 +494,11 @@ def select_due_race_data_sync_task() -> dict:
         event = events[claim.event_id]
         queue = claim_queue(claim=claim, event=event,
                             retry=event.live_tracking.consecutive_failures > 0)
+        priority = claim_priority(claim=claim, event=event,
+                                  retry=event.live_tracking.consecutive_failures > 0)
         transaction.on_commit(
-            lambda kwargs=dispatch_kwargs, queue=queue: sync_race_event_provider_task.apply_async(
-                kwargs=kwargs, queue=queue,
+            lambda kwargs=dispatch_kwargs, queue=queue, priority=priority: sync_race_event_provider_task.apply_async(
+                kwargs=kwargs, queue=queue, priority=priority,
             )
         )
     count = len(claims)

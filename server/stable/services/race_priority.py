@@ -31,6 +31,11 @@ def claim_queue(*, claim, event, retry=False):
     return "race_sync_v2"
 
 
+def claim_priority(*, claim, event, retry=False):
+    # Redis BRPOP 先遍历 priority_steps，再遍历队列；不依赖 set 的迭代顺序。
+    return 0 if retry and "result" in claim.data_kinds and needs_priority_result(event) else 3
+
+
 @contextmanager
 def result_transport_scope(claim):
     from .race_data_sync_control import lock_and_validate_race_data_sync_claim_for_apply

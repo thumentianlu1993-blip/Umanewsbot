@@ -612,7 +612,12 @@ def apply_data_sync_result_observation(
         if (observation.normalized_payload["external_race_id"] != source.external_race_id
                 or observation.normalized_payload["region"] != source.region_code):
             return DataSyncResultApplyDecision("rejected", "event_identity_mismatch")
-        if project_current and lifecycle_trusted:
+        granted_identity_id = models.RaceDataSyncEnrollment.objects.filter(
+            event_id=expected_event_id,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+        ).values_list("source_identity_id", flat=True).first()
+        winner_source_granted = is_multisource or granted_identity_id in (None, source.pk)
+        if project_current and lifecycle_trusted and winner_source_granted:
             _advance_from_winner(event=event, lifecycle=lifecycle, observation=observation,
                 source_class=candidate_source_class, rows=rows, now=now)
         try:
@@ -913,10 +918,6 @@ def apply_data_sync_result_observation(
         correction_conflict = bool(
             current is not None and not authorized_replacement
         )
-        granted_identity_id = models.RaceDataSyncEnrollment.objects.filter(
-            event_id=expected_event_id,
-            state=models.RaceDataSyncEnrollmentState.ENROLLED,
-        ).values_list("source_identity_id", flat=True).first()
         initial_from_ungranted_source = bool(
             project_current
             and current is None

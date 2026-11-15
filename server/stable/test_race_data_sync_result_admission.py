@@ -228,7 +228,7 @@ class DataSyncResultAdmissionTests(TestCase):
         payload = {
             "external_race_id": source.external_race_id,
             "off_time": self.event.race_datetime.isoformat(),
-            "region": "japan_jra",
+            "region": source.region_code,
             "course": "Tokyo",
             "race_name": "Data Sync Result Admission",
             "race_status": race_status,

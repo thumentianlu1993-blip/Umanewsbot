@@ -3063,7 +3063,7 @@ def finish_multisource_claim(
                 )
                 eligible = first_allowed is not None and first_allowed <= now and (
                     denied
-                    or reason_code in ("not_found", "not_published")
+                    or reason_code in ("not_found", "not_published", "result_incomplete")
                     or (
                         reason_code
                         in ("transport_failed", "timeout", "jra_transport_failed")

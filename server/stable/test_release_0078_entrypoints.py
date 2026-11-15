@@ -291,7 +291,7 @@ class HostHarness:
             (root / "fake-control-release.sh").write_text(shell.replace("/app/server", str(root / "server")).replace("/app/deploy/", str(root / "deploy") + "/"))
         self.repair = root / "runtime/migration_history_repair"
         self.repair.mkdir(mode=0o700, parents=True)
-        self.restore = {name: name in {"nginx"} if manual else name in {"web", "worker", "beat", "race_sync_v2_worker", "nginx"} for name in SERVICES}
+        self.restore = {name: name in {"nginx"} if manual else name in {"web", "worker", "beat", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "nginx"} for name in SERVICES}
         flags = {name: "true" if live_flags and name.startswith("RACE_DATA_SYNC_") else "false" for name in WRITER_FLAGS}
         (root / "test-state.json").write_text(json.dumps({"leaf": leaf, "database_identity": DB, "services": self.restore, "compose_services": list(SERVICES), "migration_count": 0, "static_complete": False,
                                                        "flags": flags, "real_control": real_control}))
@@ -428,6 +428,22 @@ class Release0078EntrypointTests(TestCase):
             if event.startswith("control-env:"):
                 call = json.loads(event.removeprefix("control-env:"))
                 self.assertEqual(call["flags"], {name: "false" for name in WRITER_FLAGS}, call["command"])
+
+    def test_first_deployment_starts_priority_workers_before_beat(self):
+        harness = self.harness()
+        initial = harness.state()
+        for name in ("race_control_worker", "race_realtime_worker"):
+            initial["services"].pop(name, None)
+        (harness.root / "test-state.json").write_text(json.dumps(initial))
+        self.assert_success(harness.initial())
+        final = harness.state()["services"]
+        self.assertTrue(final["race_control_worker"])
+        self.assertTrue(final["race_realtime_worker"])
+        manifest = contract.read_json(harness.directory / "manifest.json")[0]
+        self.assertTrue(manifest["restore_services"]["race_control_worker"])
+        events = harness.events()
+        for name in ("race_control_worker", "race_realtime_worker"):
+            self.assertLess(events.index("start-after-completion:" + name), events.index("start-after-completion:beat"))
 
     def test_live_flags_release_preserves_enabled_services_and_disarms_full_control_chain(self):
         for leaf, compose in ((TARGET, "docker-compose.prod.yml"), (SOURCE, "docker-compose.prod.lowcost.yml")):

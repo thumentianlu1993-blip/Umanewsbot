@@ -927,9 +927,6 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = int(env("CELERY_WORKER_PREFETCH_MULTIPLIER", "1"))
 CELERY_TASK_ACKS_LATE = env_bool("CELERY_TASK_ACKS_LATE", True)
 CELERY_TASK_TRACK_STARTED = True
-# Redis 按订阅队列顺序消费；实时 worker 将失败重试队列放在首位。
-CELERY_BROKER_TRANSPORT_OPTIONS = {"queue_order_strategy": "priority"}
-
 CELERY_TASK_ROUTES = {
     "stable.tasks.select_due_race_data_sync_task": {"queue": "race_control"},
     "stable.tasks.scan_due_race_event_lifecycle_task": {"queue": "race_control"},

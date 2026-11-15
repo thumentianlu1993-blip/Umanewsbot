@@ -16455,7 +16455,7 @@ class RaceEventPageMVPTests(TestCase):
         self.client.force_login(self.user)
         for index in range(50):
             RaceEvent.objects.create(
-                year=2026,
+                year=(timezone.localdate() + timedelta(days=index + 1)).year,
                 slug=f"filtered-race-{index}",
                 original_name=f"Filtered Race {index}",
                 chinese_name=f"筛选赛事 {index}",

@@ -5,7 +5,7 @@ import json
 import os
 import tempfile
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -13,7 +13,7 @@ from django.db.models import Prefetch
 from django.utils import timezone
 
 from stable import models
-from stable.services.race_event_lifecycle import decide_race_lifecycle
+from stable.services.race_event_lifecycle import decide_race_lifecycle, _local_next_midnight
 
 
 _TERMINAL_STATES = {
@@ -141,13 +141,14 @@ def _lifecycle(event: models.RaceEvent, *, as_of: datetime) -> tuple[Any, bool]:
         local_date=event.local_date,
         region=event.country_region,
     )
-    due = (
-        event.status == models.RaceEventStatus.FINISHED
-        or (
-            decision.action == "transition"
-            and decision.to_status == models.RaceEventStatus.FINISHED
-        )
-    )
+    # 缺赛果清单的时间窗口不依赖“可以完赛”的状态决策。
+    # 保留历史补采窗口；这只是只读盘点，不触发赛事状态写入。
+    due = event.status == models.RaceEventStatus.FINISHED
+    if decision.action != "error":
+        if event.race_datetime:
+            due = due or as_of >= event.race_datetime + timedelta(minutes=30)
+        elif event.local_date:
+            due = due or as_of >= _local_next_midnight(event.local_date, event.timezone_name)
     if event.status in {
         models.RaceEventStatus.CANCELLED,
         models.RaceEventStatus.POSTPONED,

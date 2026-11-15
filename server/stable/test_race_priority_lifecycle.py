@@ -85,6 +85,29 @@ class PriorityRoutingTests(SimpleTestCase):
         self.assertEqual(retry_delay(priority=False, reason="artifact_daily_requests_exceeded", now=NOW),
                          timedelta(hours=17))
 
+    def test_redis_checks_retry_priority_before_any_normal_realtime_queue(self):
+        from unittest.mock import Mock
+        from kombu.transport.redis import Channel
+        from kombu.utils.scheduling import priority_cycle
+        from stable.services.race_priority import claim_priority
+        claim = SimpleNamespace(data_kinds=("result",))
+        event = SimpleNamespace(status="running", result_confirmed_at=None)
+        normal = claim_priority(claim=claim, event=event, retry=False)
+        retry = claim_priority(claim=claim, event=event, retry=True)
+        self.assertLess(retry, normal)
+        # 实际 Redis transport 生成的 BRPOP 顺序，包含最坏的队列顺序。
+        channel = object.__new__(Channel)
+        channel._active_queues = {"race_realtime", "race_realtime_retry"}
+        channel.active_fanout_queues = set()
+        channel._queue_cycle = priority_cycle(["race_realtime", "race_realtime_retry"])
+        channel.priority_steps = [0, 3, 6, 9]
+        channel.global_keyprefix = ""
+        channel.client = Mock()
+        channel._brpop_start(timeout=1)
+        keys = channel.client.connection.send_command.call_args.args[1:-1]
+        self.assertLess(keys.index(channel._q_for_pri("race_realtime_retry", retry)),
+                        keys.index(channel._q_for_pri("race_realtime", normal)))
+
     def test_control_tasks_use_dedicated_queue(self):
         for task in (
             "select_due_race_data_sync_task", "scan_due_race_event_lifecycle_task",

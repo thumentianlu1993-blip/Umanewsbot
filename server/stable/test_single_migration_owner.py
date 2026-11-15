@@ -2595,7 +2595,7 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
             )
             drain = index(is_drain_exec, "celery drain")
             stop_worker = index(
-                lambda e: e[0] == "compose" and e[2] == ["stop", "worker", "race_control_worker", "race_realtime_worker"],
+                lambda e: e[0] == "compose" and e[2] == ["stop", "worker"],
                 "stop worker",
             )
             stop_race_live = index(

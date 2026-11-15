@@ -226,6 +226,9 @@ def prepare(env, *, resume):
         if origin["handoff_action"] == "manual-release" and any(services[service]["running"] for service in contract.SERVICES if service != "nginx"):
             raise ValueError("manual 0078 release requires stopped application services")
         restore = {service: values["running"] for service, values in services.items()}
+        # 正常在线升级首次引入两个常驻 worker；manual-release 仍保留停服意图。
+        if origin["handoff_action"] == "deploy" and (restore["worker"] or restore["beat"]):
+            restore.update(race_control_worker=True, race_realtime_worker=True)
         if os.path.lexists(manifest_path):
             if not resume or not env.get("RELEASE_0078_RECOVERY_MANIFEST_SHA256"):
                 raise ValueError("0078 backup proof exists; resume with its original SHA")
