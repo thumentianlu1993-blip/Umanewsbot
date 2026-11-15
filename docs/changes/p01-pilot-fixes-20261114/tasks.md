@@ -1,0 +1,30 @@
+# 任务
+
+- [x] (application) 测试：冻结原失败，取得数字、称谓、选稿引用、审校载荷、请求参数真实RED及目录正反例。
+- [x] (application) 实现：逐项最小修复并同例GREEN，补局部修复/公开证据重放。
+- [x] (integration) 验证：范围回归、原始5篇响应离线重放和固定策略/脚本检查。
+- [ ] (integration) 验证：同样5篇真实模型复测，逐段语义复核、耗时及费用对照：已执行，耗时/费用达标，质量未通过，见retest_report.md。
+- [ ] (operations) 验证：独立review、固定树范围CI及Draft PR，明确尚未上线/启用的边界。
+
+## 2026-11-15 三项收敛修复
+- [x] (application) 测试：Q1–Q3固定最小真实失败原件、协议与边界，取得有效RED。
+- [x] (application) 实现：集中v3 Prompt，澄清实体边界，新增单一fluency审校维度。
+- [x] (integration) 测试与实现：Q4–Q5局部修复/重审/发布证据/旧协议回归。
+- [x] (integration) 验证：Q6–Q7离线报告及复杂度预算，准备样本与真实复测预算。
+- [ ] (operations) 验证：原reviewer只读复审、最终范围CI，保持Draft与P01关闭。
+
+## 分阶段修复与验证
+- [x] (application) 测试：实体操作边界、通用带分数和未知数字阻断真实RED。
+- [x] (application) 实现：共享实体响应字段、精确带分数比较、证据优先审校Prompt及同例GREEN。
+- [x] (integration) 验证：相关离线回归与原review上下文复审，固定审校正反样本。
+- [ ] (integration) 验证：有界真实审校配置比较；仅阶段通过后整链路原五篇/预留三篇。
+- [ ] (operations) 验证：最终范围CI、回执与报告，Draft/P01关闭。
+
+本轮真实审校执行5/8后按回执未知停止；事后只读核账未知0，不恢复半批。普通配置已见法国/英国漏检；思考及全文未执行，相关验收项保留未勾选。详见stage_validation_result.md。
+
+## 审校能力优化
+- [x] (application) 测试与实现：名称误报边界真实RED/GREEN；三轮审校指令保持原长度预算与旧协议。
+- [x] (integration) 验证：实体保护、真实语病、运行投影和发布重放101项隔离回归通过；原review上下文APPROVED、前后指纹一致。
+- [ ] (integration) 验证：固定新版本真实正反样本，不沿用停止批次结果冒称通过。
+
+审校优化新包真实验证已完整执行16次，两配置均未达标；D011正确对照标签存在标题遗漏缺陷，保留原样并单列说明。真实质量验收项不勾选，详见audit_improvement_result.md。

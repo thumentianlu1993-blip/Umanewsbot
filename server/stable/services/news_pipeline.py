@@ -594,10 +594,22 @@ def risk_reasons(run):
     return reasons
 
 
+def minimum_audit_profile():
+    if context_contract_version() != 'context-v3':
+        return 'base'
+    value = getattr(settings, 'NEWS_QUALITY_POLICY', {}).get('audit_min_profile', 'base')
+    if value not in ('base', 'deep'):
+        from stable.services.news_content import ContentBlocked
+        raise ContentBlocked('audit_min_profile_invalid')
+    return value
+
+
 def required_profile(run):
+    if context_contract_version() == "context-v3" and run.stage == "event_classify":
+        return "deep"
     if not context_enabled() or run.stage != "fact_audit":
         return "base"
-    return "deep" if risk_reasons(run) or run.quality_snapshot.get("deep_required") else "base"
+    return "deep" if minimum_audit_profile() == 'deep' or risk_reasons(run) or run.quality_snapshot.get("deep_required") else "base"
 
 
 def body_context_source(clean):
@@ -614,7 +626,11 @@ def body_context_source(clean):
 def context_payload(run):
     from stable.services.news_content import stable_source, protect_source, protected_translation_map, translation_glossary
     from stable.services.news_editorial import RESPONSE_SCHEMA, IDENTITY_CONTRACT
+    from stable.services.news_translation_quality import expected_audit_payload, name_form_hints
     source = stable_source(run.clean_snapshot)
+    if context_contract_version() == "context-v3":
+        from stable.services.news_editorial import quoted_contracts
+        RESPONSE_SCHEMA, IDENTITY_CONTRACT = quoted_contracts()
     if run.stage == "event_classify":
         return {"source": source, "candidates": _event_candidates(run), "response_schema": RESPONSE_SCHEMA,
                 "identity_contract": IDENTITY_CONTRACT,
@@ -640,10 +656,13 @@ def context_payload(run):
             return repair_payload(run.clean_snapshot, run.source_snapshot["language"], state, first.pk)
         return initial_payload(run.clean_snapshot, run.source_snapshot["language"], contract_version=context_contract_version())
     if run.stage == "fact_audit":
+        if context_contract_version() == "context-v3":
+            return expected_audit_payload(source, run.translation_snapshot, run.entity_snapshot["occurrences"], run.editorial_snapshot)
         return {"source": source, "target": run.translation_snapshot,
                 "entities": run.entity_snapshot["occurrences"], "editorial": run.editorial_snapshot}
     if run.stage == "translate_full":
-        glossary = ({"entity_glossary": translation_glossary(source, run.entity_snapshot["occurrences"])}
+        glossary = ({"entity_glossary": translation_glossary(source, run.entity_snapshot["occurrences"]),
+                     "name_form_hints": name_form_hints(source, run.entity_snapshot["occurrences"])}
                     if context_contract_version() == "context-v3" else {})
         protected = protect_source(source, run.entity_snapshot["occurrences"])
         task = run.quality_snapshot.get("repair_task", {}) if run.repair_count else {}
@@ -659,7 +678,7 @@ def context_payload(run):
                                "blocks": [row for row in blocks if row["id"] in ids or "summary" in ids]},
                     "context": [row for i, row in enumerate(blocks) if i in adjacent],
                     "previous": {key: texts[key] for key in ids}, "repair": task["evidence"],
-                    "entities": run.entity_snapshot["occurrences"]}
+                    **({"entities": run.entity_snapshot["occurrences"]} if context_contract_version() != "context-v3" else {})}
         return {**glossary, "mode": "full", "source": protected, "repair": task}
     raise ValueError("stage_not_registered")
 
@@ -699,9 +718,9 @@ def context_projection(run, attempt):
                                     "input_sha": attempt.input_sha}
         if run.manual_target:
             target = manual_translation(run.manual_target)
-            hard = hard_translation_checks(run.clean_snapshot, target)
+            hard = hard_translation_checks(run.clean_snapshot, target, rows if attempt.stage == "entity_check" else run.entity_snapshot["occurrences"])
             return {**update, "translation_snapshot": target, "stage": "fact_audit",
-                    **({"state": "review", "reason": "manual_hard_check_failed"} if not hard["passed"] else {})}
+                    **({"state": "review", "reason": "numeric_not_comparable" if hard.get("numeric_not_comparable") else "manual_hard_check_failed"} if not hard["passed"] else {})}
         return {**update, "stage": "translate_full"}
     if attempt.stage == "translate_full":
         raw = deepcopy(attempt.result)
@@ -717,16 +736,19 @@ def context_projection(run, attempt):
         except ContentBlocked as error:
             ids = translation_repair_ids(run.clean_snapshot, run.entity_snapshot["occurrences"], raw)
             return repair_projection(run, quality, ids, str(error))
-        hard = hard_translation_checks(run.clean_snapshot, target)
+        hard = hard_translation_checks(run.clean_snapshot, target, rows if attempt.stage == "entity_check" else run.entity_snapshot["occurrences"])
         quality.update(target_sha=digest(target))
         if not hard["passed"]:
-            quality.update(numeric=hard["numeric"], repair_block_ids=hard["repair_block_ids"])
+            quality.update(numeric=hard["numeric"], located_issues=hard["located_issues"], repair_block_ids=hard["repair_block_ids"])
+            if hard.get('numeric_not_comparable'):
+                return {"state": "review", "reason": "numeric_not_comparable", "lease_until": None,
+                        "quality_snapshot": quality, "translation_snapshot": target}
             return {**repair_projection(run, quality, hard["repair_block_ids"], "hard_translation_failed"),
                     "translation_snapshot": target}
         return {**update, "translation_snapshot": target, "quality_snapshot": quality, "stage": "fact_audit"}
     if attempt.stage == "fact_audit":
         response = audit_corrections(run.editorial_snapshot, attempt.result)
-        result = validate_audit(run.clean_snapshot, run.translation_snapshot, response, contract_version=context_contract_version())
+        result = validate_audit(run.clean_snapshot, run.translation_snapshot, response, contract_version=context_contract_version(), entities=run.entity_snapshot["occurrences"])
         preserved = {key: value for key, value in quality.items() if key in
                      {"repair_base", "repair_task", "repair_attempt_id", "deep_required", "upgrade_attempt_id"}}
         quality = {**preserved, **result, "strong_attempt_id": attempt.pk, "input_sha": attempt.input_sha, "policy_sha": run.policy_sha}
@@ -734,6 +756,8 @@ def context_projection(run, attempt):
             return {**update, "quality_snapshot": quality, "state": "ready", "stage": "publish"}
         if not result["evidence_valid"]:
             return {**update, "quality_snapshot": quality, "state": "review", "reason": "audit_evidence_invalid"}
+        if result.get('numeric_not_comparable'):
+            return {**update, "quality_snapshot": quality, "state": "review", "reason": "numeric_not_comparable"}
         if result["verdict"] == "uncertain":
             if attempt.usage["price"]["profile"] == "base" and not quality.get("deep_required"):
                 quality.update(deep_required=True, upgrade_attempt_id=attempt.pk)

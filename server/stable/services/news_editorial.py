@@ -148,6 +148,9 @@ def validate_editorial(clean, response, *, source_scope, candidates=(), aliases=
         raise ContentBlocked("editorial_reason_missing")
     if priority in {"reject", "uncertain"}:
         return {**response, "identity_key": None, "facts": []}
+    from stable.services.news_pipeline import context_contract_version
+    if context_contract_version() == "context-v3":
+        response = locate_editorial_quotes(clean, response)
     identity = response["identity"]
     if type(identity) is not dict or set(identity) != {"kind", "fields", "evidence"}:
         raise ContentBlocked("identity_schema")
@@ -256,3 +259,36 @@ def audit_corrections(editorial, response):
     if checked != expected:
         raise ContentBlocked("correction_not_substantively_verified")
     return {key: value for key, value in response.items() if key != "corrections"}
+
+
+def quoted_contracts():
+    from copy import deepcopy
+    schema, contract = deepcopy(RESPONSE_SCHEMA), deepcopy(IDENTITY_CONTRACT)
+    schema['identity']['evidence'] = '每个 fields 键映射为 {block_id,quote,context}，quote/context逐字引用同一原文块并唯一定位'
+    schema['facts'][0]['source_span'] = {'block_id':'ID','quote':'逐字事实引文','context':'包含引文的唯一原文上下文'}
+    contract['rules'][0] = '仅选择kind的一组字段，不增删；identity.evidence同样的键，每项{block_id,quote,context}逐字唯一定位，不计算字符偏移。'
+    return schema, contract
+
+
+def locate_editorial_quotes(clean, response):
+    from copy import deepcopy
+    from stable.services.news_content import exact_span
+    result = deepcopy(response)
+    texts = block_map(clean)
+    def locate(ref):
+        if type(ref) is not dict:
+            raise ContentBlocked('editorial_span_schema')
+        if set(ref) == {'block_id','start','end'}:
+            return ref  # 仅兼容已合法的旧跨度，原校验仍执行。
+        if set(ref) != {'block_id','quote','context'} or ref['block_id'] not in texts:
+            raise ContentBlocked('editorial_span_schema')
+        start, end = exact_span(texts[ref['block_id']], ref['quote'], ref['context'])
+        return {'block_id':ref['block_id'],'start':start,'end':end}
+    identity = result.get('identity')
+    if type(identity) is dict and type(identity.get('evidence')) is dict:
+        identity['evidence'] = {key:locate(value) for key,value in identity['evidence'].items()}
+    if type(result.get('facts')) is list:
+        for fact in result['facts']:
+            if type(fact) is dict and 'source_span' in fact:
+                fact['source_span'] = locate(fact['source_span'])
+    return result

@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "base_sha": "efb2a6c7e7b7e554515217fd38fd7c40c674249a",
+  "reason": "P01真实试跑修复及三项收敛增量：数字/称谓/载荷/选稿协议，具名边界Prompt与v3单一fluency审校维度及一次修复。无迁移、数据库模型、队列或生产配置变化。保留news_quality、翻译、核心及选测基础设施领域；精确内容和基线绑定，不扩大到赛事采集全仓。",
+  "domains": [
+    "news_quality",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/p01-live-pilot-20261114/report.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "abd0b6461b173220002cc068d3b69f17f687db6feca26e11579be0050612b4d6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-main-integration-20261114/rollout.md",
+      "status": "modified",
+      "before_hash": "72d32c36e12aae4c008d7d6daa5ce0c90271a126adf440952ea233129d0d573d",
+      "after_hash": "99ac3534a956c3b6cca416fe86de77cb89a519bf3c3659e490118b1f188af9fd",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-main-integration-20261114/tasks.md",
+      "status": "modified",
+      "before_hash": "cb36515f095d3efa418077b933f1c105fd47f547f0a3e1aced144f70454d4a01",
+      "after_hash": "16fcc67ce78bc8ae4689ca1b7b3d8be4fc77e26f652cfaaa4981965f314bf7a8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/audit_improvement_result.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e535f46538ced3bee167e1dfb1e5402569d81fc5b339a5df80b14e654730d745",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "79d9e28cf8b2722945be503f3ee955518cc7ca96a76af93d336830c05e56c899",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/quality_boundaries.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f85edb3687594c35c326c900fc9e8d5743d209aaac25e5876893d285661ee340",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/quality_boundaries_retest.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a272126f291b4534b4a17a762163a3b36dceb1493204e87f716cd011455590ef",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/retest_report.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "13d9f58ff33d1408cb5ac5e3f418431fe9eddf6d0b68ef86956ede0af959b5c6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3ca2732aff0d4e4c07dbe3341f26bd88f1e7edc5bc569188f8e8e920af0b0ff1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "01fb5c9fb977c3562c07da94373bb5b04d4946b5e76466b1dddd0a8d90f8f7ec",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/stage_validation.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "57644335d09f31fdc4542b8225e47fb297277d5ccd00e9cd7922f4ee25609e87",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/stage_validation_result.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "59d2dbaed09b655433e10bfde129b30884d5d15f8c0d1255f14d5681ce794c1a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "a8156e9e69579ee90a406c7694adecaab9b5531283ed945fbe48bcc837d8159d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "92d2d30d9585df6498c798c82d7ccc5c06b8715a9baee8a07b6bd8b0c26e415e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/p01-pilot-fixes-20261114/validation.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8850a712f4c29f297395aafbba1b924951cf2d18319524a5b6c7162d633631e8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "7bbf17b36671c9166197ee2979a2ef588daa7d2b2736040472dbab965b93c1f0",
+      "after_hash": "b728bbeb733ab3256be874cd856c503f3f739ac3e17e5512b986340caadba20c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "e699b100ad2145018a070f6804b3ae9af1447615fc3ce84c9aa333f494bfa116",
+      "after_hash": "7f45106aa6cf1cacf1b75f5a14d27bf9feaa427e829b6efd499be763fcf421b7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "e072452ac78d6924ba5a863d2b5584f36de46070e3a0a778854c580652ed1c1e",
+      "after_hash": "f0d98b31a539af4de57964c37b1ede809e9948e0b6a66225d270bf69b80a6a2d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/p01_live_pilot_failures_20261114.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "275d3230fff0b70da67d7b30935c084c0792b5decda08fb2a0a00cca67302821",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/p01_quality_boundaries_20261115.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "7ba2117adbbf054c0f38143382364eeb33cf5aea5dcaf787746f5e16c2b9d790",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/p01_stage_boundary_failures_20261115.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "b7e20cd9a5b4bbd02251aede40d9d9dc606bb57fc6f9255086194388065804e5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_content.py",
+      "status": "modified",
+      "before_hash": "fe79f8a61dfef9c726715dc1cebaa6a8d25e32f4b0d68bdb5767e63724128a6f",
+      "after_hash": "964aa29f826e23b040308ce987d631261b9829c68aa5fdb271c88dbddb19b55a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_editorial.py",
+      "status": "modified",
+      "before_hash": "45980288dafd4930e9efd78e830468579f49b461f3be345b9a723fe248c8b700",
+      "after_hash": "57631cf2d0dbc71c09c32a3bcb2881afdbe3bbb5b0f232279ff36be312923fa9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_entity_taxonomy.py",
+      "status": "modified",
+      "before_hash": "71aeb9315a69933c0fce1d1f29a5c9a2c6f4aea9fe0ba7b2d8ed9cd4b047a501",
+      "after_hash": "0c9d7ef08e99049eba1ed203759472912afa7d0393325bcb2bf562f9be1a316c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_entity_units.py",
+      "status": "modified",
+      "before_hash": "8ef14c61b026815d88194e9b33ca9282b3f50ba1b22562b3178dfae3a4847a72",
+      "after_hash": "ea6b1896bf89eb6da0acbdf1a1b009e3d7ff309111e7c213b03ffb47a9ddab5e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_model_gateway.py",
+      "status": "modified",
+      "before_hash": "1617dad52b2d07ff1305bff14b4b3cf22ef987ffc5abee4e309639493d049e43",
+      "after_hash": "9a75c7166b28ce92ad1ee31d9b808c8167165814166c406f2318eaf968f50ab2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_numeric_equivalence.py",
+      "status": "modified",
+      "before_hash": "4d4214aa224bd0d001b6a296d195f159fb13f97166efad3be5ec2e1f2e6b29f7",
+      "after_hash": "f53daa40eef02d85dcee6d1f92bc6ed00bb96e877e65a8a205afc14a98f4433a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_pipeline.py",
+      "status": "modified",
+      "before_hash": "b1aae68b0a912c53daa8e2bae0135b21dbefc35c3e524c6d51da1f8883569357",
+      "after_hash": "971c08317acba6178efefb7b8c881e797c029080a73cefa65adbfe1595cdb93d",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_prompts.py",
+      "status": "modified",
+      "before_hash": "baebaabf306ad9a19215803c5985d83851fb8756e37f63a79b18f769d00e9eaf",
+      "after_hash": "92a10e8d71b7c43d2aa69394f2f8be731d3d342edc984271f346e99ad277f730",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_publication.py",
+      "status": "modified",
+      "before_hash": "ff46e3b8bc70fcb8f20157dad1cab6706e0a0f0a1529e70cec48f239ad9a164d",
+      "after_hash": "471a639bc24012029b21bba747421dd879d4e3852403418b94dc55ed46169fcd",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/news_translation_quality.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "77b09942f7d534bdc781c2bfb9c6c67e5c6f390635a944804256ff133a16cfcb",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_annotation_translation.py",
+      "status": "modified",
+      "before_hash": "888a18ac9858624597cf3af5e27ce2b73e48a43b2ed3a2d6563e3f8a4b29e2e9",
+      "after_hash": "b5e70d877f02bebc12fffcf20d56d7498f6a2db648e479e26b6e0546eb680038",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_news_workflow.py",
+      "status": "modified",
+      "before_hash": "5ac37648c2f200523f579b17fca3aab4af5cbd603633af4207f52ff54f83e6e3",
+      "after_hash": "a5db35f6cd8df8da1c28e7f7295de932b7052f41647f62bfbb58aa61c6896423",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_p01_pilot_regression.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "cacfa7b5155bcd9ee3bc26723c7148893f3ea33eb033982291e082deb202fbd1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "5dec96904ecc94b07668b94e815df034ebba217a648dc26ae8ef1e267dc95460",
+      "after_hash": "0a34f9e77903a034f1dbdc36b5e6e27d3e08f30023fda6cdc8e1b7f0ae06852f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "44e9f98e2915e9833fa16b29499a9b15697c86fd7735cbe0eb7839085f380719",
+      "after_hash": "5395f1b0306f6885c4cc2d39c739740bae28e7c97b8fbb26f0239980eb74d2a1",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

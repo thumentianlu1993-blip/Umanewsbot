@@ -9950,3 +9950,14 @@ RACE_DATA_RAW_ARTIFACT_ROOTS=/run/race-data-sync
 PR #302（merge `0db22f1e`）按获准精确包发布候选 `cba39875`，生产事务提交153目标、111场1071行、101来源时刻、109换绑；四应用/配置、153页面、公网详情、分场日历及冠军历史通过。无新增迁移，schema0084保留，worker/Beat恢复，QQ关闭，发布锁释放。整库备份按用户明确指令未作为前置。
 
 发布后自然任务已执行，TOBA年度目录403导致自动采集仍未通过。保留稳定版本，后续本地快照修复仅涉及代码、快照和配置，不重导历史批次。目录原件准备和替换方式见 [calendar_snapshot.md](changes/us-race-automation/calendar_snapshot.md)；具体交付统一按根 AGENTS.md。
+
+
+## 2026-11-14 P01增量schema与关闭态应用发布
+
+当前四应用为`umanews-p01:e6c47a98-r2`、schema0088。维护仍使用生产容器标签中记录的完整
+Compose链，最后一层为`/opt/umanews-external-staging/p01-e6c47a98-r2/release-identity.json`，
+不得用上文历史短链替代。本次完整输入链及恢复基线保留在同目录`execution-plan.json`。
+首轮权限失败已安全恢复，随后R2发布通过；以后复制deploy目录构建增量镜像时，必须保留shell
+启动权限，并对四个实际entrypoint做隔离启动探针。Docker 29 containerd返回的容器Image可能为
+OCI manifest digest，不能与config digest混用。
+迁移和恢复证据、发布验证、功能关闭边界见[发布记录](changes/p01-main-integration-20261114/rollout.md)。

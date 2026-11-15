@@ -1031,7 +1031,8 @@
       "stable.test_p01_news_source_evidence",
       "stable.test_p01_news_workflow",
       "stable.test_p01_main_integration",
-      "stable.tests_legacy.AdapterTests"
+      "stable.tests_legacy.AdapterTests",
+      "stable.test_p01_pilot_regression"
     ]
   },
   "dependencies": {
@@ -3329,6 +3330,12 @@
       "domains": [
         "news_quality"
       ]
+    },
+    "server/stable/test_p01_pilot_regression.py": {
+      "label": "stable.test_p01_pilot_regression",
+      "domains": [
+        "news_quality"
+      ]
     }
   },
   "profiles": {
@@ -3697,7 +3704,8 @@
     "stable.test_p01_news_review_regressions": "django",
     "stable.test_p01_news_source_evidence": "django",
     "stable.test_p01_news_workflow": "django",
-    "stable.test_p01_main_integration": "django"
+    "stable.test_p01_main_integration": "django",
+    "stable.test_p01_pilot_regression": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

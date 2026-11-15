@@ -81,6 +81,8 @@ class WorkflowFixture:
             data = {"title": "奖金调整公告", "summary": "官方调整奖金", "blocks": [{"id": "b0", "text": f"{token}在ZZ发布文件D42。"}, {"id": "b1", "text": f"奖金为{value}。"}]}
         elif attempt.stage == "fact_audit":
             data = {"verdict": "fail" if self.audit_fails else "pass", "checks": {key: not self.audit_fails for key in AUDIT_CHECKS}, "issues": []}
+            if settings.NEWS_QUALITY_POLICY.get("contract_version") == "context-v3":
+                data["checks"]["fluency"] = not self.audit_fails
         else:
             raise AssertionError(attempt.stage)
         return SimpleNamespace(id="fixture-" + str(attempt.pk), choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(data), tool_calls=None))], usage=SimpleNamespace(prompt_tokens=50, completion_tokens=20))
@@ -169,6 +171,8 @@ class ContextWorkflowFixture(WorkflowFixture):
             self.audit_count += 1
             self.profiles.append(attempt.usage['price'].get('profile'))
             if self.first_uncertain and self.audit_count == 1:
+                if settings.NEWS_QUALITY_POLICY.get('contract_version') == 'context-v3':
+                    data['checks']['numbers_units'] = False
                 data.update(verdict='uncertain', issues=[{'kind': 'numbers_units',
                     'source': {'block_id': 'b1', 'quote': '27', 'context': 'The prize is 27.'},
                     'target': {'block_id': 'b1', 'quote': '27', 'context': '奖金为27。'}, 'missing': False}])

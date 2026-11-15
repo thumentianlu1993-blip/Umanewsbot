@@ -29,9 +29,23 @@ def build_units(clean):
     return result
 
 
+def response_fields(payload):
+    fields = ['units']
+    if payload['mode'] == 'repair' and (payload['entity_contract'] != 'entity-units-v3'
+            or any(issue.get('code') == 'ambiguous_occurrence' for issue in payload['issues'])):
+        fields.append('decisions')
+    return fields
+
+
+def _with_response_fields(payload):
+    if payload['entity_contract'] == 'entity-units-v3':
+        payload['response_fields'] = response_fields(payload)
+    return payload
+
+
 def initial_payload(clean, language, *, contract_version='context-v2'):
-    return {'entity_contract': unit_contract(contract_version), 'mode': 'initial', 'clean_sha': clean['clean_sha'],
-            'language': language, 'units': build_units(clean)}
+    return _with_response_fields({'entity_contract': unit_contract(contract_version), 'mode': 'initial', 'clean_sha': clean['clean_sha'],
+            'language': language, 'units': build_units(clean)})
 
 
 def repair_payload(clean, language, state, attempt_id):
@@ -47,11 +61,11 @@ def repair_payload(clean, language, state, attempt_id):
         text = unit['text'][offset:offset + 640]
         context.append({'unit_id': unit['unit_id'], 'block_id': unit['block_id'],
                         'start': unit['start'] + offset, 'text': text})
-    return {'entity_contract': state.get('entity_contract', VERSION), 'mode': 'repair', 'clean_sha': clean['clean_sha'],
+    return _with_response_fields({'entity_contract': state.get('entity_contract', VERSION), 'mode': 'repair', 'clean_sha': clean['clean_sha'],
             'language': language, 'base_attempt_id': attempt_id,
             'units': [u for i, u in enumerate(all_units) if i in pending],
             'context_units': context,
-            'accepted': deepcopy(state['accepted']), 'issues': deepcopy(state['issues'])}
+            'accepted': deepcopy(state['accepted']), 'issues': deepcopy(state['issues'])})
 
 
 def _positions(text, quote):
@@ -135,7 +149,7 @@ def evaluate(clean, payload, response, *, previous=None):
     expected = (initial_payload(clean, payload.get('language'), contract_version=contract) if previous is None else
                 repair_payload(clean, payload.get('language'), previous, payload.get('base_attempt_id')))
     if payload != expected: raise ContentBlocked('entity_unit_input_changed')
-    keys = {'units', 'decisions'} if previous is not None else {'units'}
+    keys = set(response_fields(expected))
     if type(response) is not dict or set(response) != keys or type(response['units']) is not list:
         raise ContentBlocked('entity_units_schema')
     all_units = build_units(clean)
@@ -171,7 +185,7 @@ def evaluate(clean, payload, response, *, previous=None):
             else:
                 propose(uid, row, raw)
 
-    if previous is not None:
+    if 'decisions' in keys:
         offered = {i['issue_id']: i for i in payload['issues'] if i.get('code') == 'ambiguous_occurrence'}
         decisions = response['decisions']; decided = set()
         if type(decisions) is not list or len(decisions) > len(offered):
