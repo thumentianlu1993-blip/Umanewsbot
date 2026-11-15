@@ -83,7 +83,7 @@
       "path": "docs/changes/p01-pilot-fixes-20261114/stage_validation.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "67d763c4439e1e73c59e28463069bba09ff7a7d2903bb76f52c87bce9515431d",
+      "after_hash": "57644335d09f31fdc4542b8225e47fb297277d5ccd00e9cd7922f4ee25609e87",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -99,7 +99,7 @@
       "path": "docs/changes/p01-pilot-fixes-20261114/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "74145ab03eb9cc6731386186ee38359da3f8dab3c4d2463654b6468d5fb00820",
+      "after_hash": "6f551c1e9343d3e1a3ea807271d40cacefb8d25f99c45f0567f62a24f667a3a3",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -123,7 +123,7 @@
       "path": "docs/current_state.md",
       "status": "modified",
       "before_hash": "7bbf17b36671c9166197ee2979a2ef588daa7d2b2736040472dbab965b93c1f0",
-      "after_hash": "a489bb6281bba18c390df65358627d03e64d7636066c53aff4b14153286904fa",
+      "after_hash": "be40bbbf89ea98884c12ec933ab82fd639063f8b36f33ce97e6115338c51b5dc",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -171,7 +171,7 @@
       "path": "server/stable/services/news_content.py",
       "status": "modified",
       "before_hash": "fe79f8a61dfef9c726715dc1cebaa6a8d25e32f4b0d68bdb5767e63724128a6f",
-      "after_hash": "e6039e18b7d282af1436e6e13e56170001d3982e653eb7047a541f4bbadef7fa",
+      "after_hash": "964aa29f826e23b040308ce987d631261b9829c68aa5fdb271c88dbddb19b55a",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -219,7 +219,7 @@
       "path": "server/stable/services/news_pipeline.py",
       "status": "modified",
       "before_hash": "b1aae68b0a912c53daa8e2bae0135b21dbefc35c3e524c6d51da1f8883569357",
-      "after_hash": "767778901f854acac89d687fde13bc3e82e9ea6ee376c987caa04d6d504dd607",
+      "after_hash": "971c08317acba6178efefb7b8c881e797c029080a73cefa65adbfe1595cdb93d",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -227,7 +227,7 @@
       "path": "server/stable/services/news_prompts.py",
       "status": "modified",
       "before_hash": "baebaabf306ad9a19215803c5985d83851fb8756e37f63a79b18f769d00e9eaf",
-      "after_hash": "17f6ea1ff7b2eefed79563f1fb3c09f5bbadbe444977724ea0a0c75bcb5f80a3",
+      "after_hash": "92a10e8d71b7c43d2aa69394f2f8be731d3d342edc984271f346e99ad277f730",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -235,7 +235,7 @@
       "path": "server/stable/services/news_publication.py",
       "status": "modified",
       "before_hash": "ff46e3b8bc70fcb8f20157dad1cab6706e0a0f0a1529e70cec48f239ad9a164d",
-      "after_hash": "6f730ba59a38c71068293e331098b6aea28af80434b3c5fe10d4bb76a2ccf8fe",
+      "after_hash": "471a639bc24012029b21bba747421dd879d4e3852403418b94dc55ed46169fcd",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -267,7 +267,7 @@
       "path": "server/stable/test_p01_pilot_regression.py",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "8aca299ddf2407998bd0ec3652fa6b01e8ac05036ac5da8bd8d7fefe1483ee48",
+      "after_hash": "cacfa7b5155bcd9ee3bc26723c7148893f3ea33eb033982291e082deb202fbd1",
       "before_mode": null,
       "after_mode": "100644"
     },

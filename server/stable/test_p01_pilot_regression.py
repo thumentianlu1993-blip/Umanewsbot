@@ -539,7 +539,7 @@ class StageBoundaryTests(SimpleTestCase):
                     result = validate_audit(source,target,response,contract_version='context-v3')
                     self.assertFalse(result['passed'])
                     self.assertEqual(result['reason'],'numeric_not_comparable')
-                    run = SimpleNamespace(clean_snapshot=source,translation_snapshot=target,editorial_snapshot={},
+                    run = SimpleNamespace(clean_snapshot=source,translation_snapshot=target,editorial_snapshot={},entity_snapshot={"occurrences":[]},
                         quality_snapshot={},policy_sha='test',manual_target=target if manual else {},repair_count=0)
                     projection = context_projection(run, SimpleNamespace(stage='fact_audit',result=response,pk=4,input_sha='test',usage={'price':{'profile':'base'}}))
                     self.assertEqual(projection['state'],'review')
@@ -584,3 +584,68 @@ class StageBoundaryTests(SimpleTestCase):
         run.clean_snapshot=clean('A horse retired.')
         with override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3','audit_min_profile':'base'}):
             self.assertEqual(required_profile(run),'deep')
+
+
+class AuditProtectedNameTests(SimpleTestCase):
+    def case(self, text='Alex (North)', kind='fluency'):
+        from stable.services.news_prompts import audit_check_keys
+        source = clean(text, title='News')
+        target = {'title':'消息','summary':'','blocks':[{'id':'b0','text':text}], 'body':text}
+        entities = [{'block_id':'b0','start':0,'end':4,'text':'Alex','replacement':'Alex','type':'person'},
+                    {'block_id':'b0','start':6,'end':11,'text':'North','replacement':'North','type':'place'}]
+        ref = {'block_id':'b0','quote':text,'context':text}
+        response = {'verdict':'fail','checks':dict.fromkeys(audit_check_keys('context-v3'),True),
+                    'issues':[{'kind':kind,'source':ref.copy(),'target':ref.copy(),'missing':False}]}
+        response['checks'][kind] = False
+        return source,target,entities,response
+
+    def test_preserved_original_names_are_not_a_repairable_fluency_error(self):
+        from stable.services.news_content import validate_audit
+        source,target,entities,response = self.case()
+        result = validate_audit(source,target,response,contract_version='context-v3',entities=entities)
+        self.assertFalse(result['passed'])
+        self.assertFalse(result['evidence_valid'])
+        self.assertEqual(result['reason'],'audit_protected_name_fluency')
+        self.assertEqual(result['repair_block_ids'],[])
+
+    def test_real_words_outside_protected_spans_still_need_review(self):
+        from stable.services.news_content import validate_audit
+        for text,kind in [('Alex (North) 在于在比赛。','fluency'),('Alex (North)','attribution')]:
+            with self.subTest(text=text,kind=kind):
+                source,target,entities,response = self.case(text,kind)
+                result = validate_audit(source,target,response,contract_version='context-v3',entities=entities)
+                self.assertTrue(result['evidence_valid'])
+                self.assertFalse(result['passed'])
+                self.assertEqual(result['repair_block_ids'],['b0'])
+
+    def test_no_entity_or_common_word_is_not_silently_exempted(self):
+        from stable.services.news_content import validate_audit
+        source,target,entities,response = self.case()
+        for rows in [[],[{**e,'type':'common_word'} for e in entities]]:
+            result = validate_audit(source,target,response,contract_version='context-v3',entities=rows)
+            self.assertTrue(result['evidence_valid'])
+            self.assertFalse(result['passed'])
+
+    @override_settings(NEWS_QUALITY_POLICY={'contract_version':'context-v3'})
+    def test_protected_only_issue_stops_before_spending_repair(self):
+        source,target,entities,response = self.case()
+        run = SimpleNamespace(clean_snapshot=source, translation_snapshot=target,
+                              entity_snapshot={'occurrences':entities}, editorial_snapshot={},
+                              quality_snapshot={}, policy_sha='policy', repair_count=0)
+        attempt = SimpleNamespace(stage='fact_audit', result=response, pk=1, input_sha='input',
+                                  usage={'price':{'profile':'base'}})
+        result = context_projection(run,attempt)
+        self.assertEqual(result['state'],'review')
+        self.assertEqual(result['reason'],'audit_evidence_invalid')
+        self.assertEqual(result['quality_snapshot']['reason'],'audit_protected_name_fluency')
+        self.assertNotIn('repair_count',result)
+
+    def test_mixed_issues_cannot_be_silently_dropped_to_pass(self):
+        from stable.services.news_content import validate_audit
+        source,target,entities,response = self.case()
+        other = deepcopy(response['issues'][0]); other['kind']='attribution'
+        response['issues'].insert(0,other); response['checks']['attribution']=False
+        result=validate_audit(source,target,response,contract_version='context-v3',entities=entities)
+        self.assertFalse(result['passed'])
+        self.assertFalse(result['evidence_valid'])
+        self.assertEqual(result['repair_block_ids'],[])

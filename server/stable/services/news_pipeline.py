@@ -748,7 +748,7 @@ def context_projection(run, attempt):
         return {**update, "translation_snapshot": target, "quality_snapshot": quality, "stage": "fact_audit"}
     if attempt.stage == "fact_audit":
         response = audit_corrections(run.editorial_snapshot, attempt.result)
-        result = validate_audit(run.clean_snapshot, run.translation_snapshot, response, contract_version=context_contract_version())
+        result = validate_audit(run.clean_snapshot, run.translation_snapshot, response, contract_version=context_contract_version(), entities=run.entity_snapshot["occurrences"])
         preserved = {key: value for key, value in quality.items() if key in
                      {"repair_base", "repair_task", "repair_attempt_id", "deep_required", "upgrade_attempt_id"}}
         quality = {**preserved, **result, "strong_attempt_id": attempt.pk, "input_sha": attempt.input_sha, "policy_sha": run.policy_sha}

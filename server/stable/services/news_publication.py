@@ -104,7 +104,7 @@ def check_publication_evidence(run):
         raise ContentBlocked("audit_input_changed")
     if audit.usage["input"].get("editorial") != run.editorial_snapshot:
         raise ContentBlocked("audit_editorial_changed")
-    quality = validate_audit(clean, run.translation_snapshot, audit_corrections(run.editorial_snapshot, audit.result), contract_version=version)
+    quality = validate_audit(clean, run.translation_snapshot, audit_corrections(run.editorial_snapshot, audit.result), contract_version=version, entities=run.entity_snapshot.get("occurrences", []))
     if not quality["passed"] or run.quality_snapshot.get("target_sha") != quality["target_sha"] or run.quality_snapshot.get("policy_sha") != run.policy_sha:
         raise ContentBlocked("target_not_audited")
     if v2:
@@ -346,7 +346,7 @@ def validate_context_chain(run, audit):
         response = audit_corrections(run.editorial_snapshot, previous.result)
         previous_target = audit_target_from_payload(previous.usage["input"])
         validate_audit_payload(run, previous.usage["input"], previous_target)
-        value = validate_audit(run.clean_snapshot, previous_target, response, contract_version=context_contract_version())
+        value = validate_audit(run.clean_snapshot, previous_target, response, contract_version=context_contract_version(), entities=run.entity_snapshot["occurrences"])
         if value.get("evidence_valid") and value.get("verdict") == "uncertain":
             deep_required = True
     if deep_required and audit.usage["price"]["profile"] != "deep":
@@ -384,7 +384,7 @@ def validate_context_chain(run, audit):
                 if audit_target_from_payload(before.usage["input"]) != old_target:
                     raise ContentBlocked("repair_cause_changed")
                 validate_audit_payload(run, before.usage["input"], old_target)
-                value = validate_audit(run.clean_snapshot, old_target, audit_corrections(run.editorial_snapshot, before.result), contract_version=context_contract_version())
+                value = validate_audit(run.clean_snapshot, old_target, audit_corrections(run.editorial_snapshot, before.result), contract_version=context_contract_version(), entities=run.entity_snapshot["occurrences"])
                 if not value.get("evidence_valid") or value.get("verdict") != "fail":
                     raise ContentBlocked("repair_cause_invalid")
                 expected_ids = value["repair_block_ids"]

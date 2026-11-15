@@ -247,9 +247,9 @@ def restore_translation(clean, entities, response):
 
 
 @model_schema
-def validate_audit(clean, target, response, *, contract_version="legacy"):
+def validate_audit(clean, target, response, *, contract_version="legacy", entities=()):
     if contract_version in {"context-v2", "context-v3"}:
-        return context_audit(clean, target, response, contract_version=contract_version)
+        return context_audit(clean, target, response, contract_version=contract_version, entities=entities)
     bounded_json(response)
     failed = {"passed": False, "reason": "audit_schema_or_unknown", "source_sha": clean["source_sha"], "target_sha": digest(target)}
     if (type(response) is not dict or set(response) != {"verdict", "checks", "issues"}
@@ -418,7 +418,25 @@ def hard_translation_checks(clean, target, entities=()):
             "summary_difference": sorted(summary_extra), "target_sha": digest(target)}
 
 
-def context_audit(clean, target, response, *, contract_version="context-v2"):
+def preserved_name_only(issue, span, entities):
+    """只识别原文位置已证实、完整保留的名称；不猜测语义或自动删除模型问题。"""
+    import unicodedata
+    source, target = issue['source'], issue['target']
+    if issue['kind'] != 'fluency' or issue['missing'] or source['quote'] != target['quote']:
+        return False
+    start, end = span
+    covered = set()
+    for row in entities:
+        a, b = row.get('start'), row.get('end')
+        if (row.get('block_id') == source['block_id'] and row.get('type') != 'common_word'
+                and type(a) is int and type(b) is int and start <= a < b <= end
+                and row.get('text') == row.get('replacement') == source['quote'][a-start:b-start]):
+            covered.update(range(a-start, b-start))
+    return bool(covered) and all(i in covered or char.isspace() or unicodedata.category(char).startswith('P')
+                                 for i, char in enumerate(source['quote']))
+
+
+def context_audit(clean, target, response, *, contract_version="context-v2", entities=()):
     bounded_json(response)
     checks = frozenset(audit_check_keys(contract_version))
     failed = {"passed": False, "evidence_valid": False, "reason": "audit_schema_or_unknown",
@@ -450,6 +468,8 @@ def context_audit(clean, target, response, *, contract_version="context-v2"):
                     spans[side] = None
                 else:
                     spans[side] = list(exact_span(texts[ref["block_id"]], ref["quote"], ref["context"]))
+            if contract_version == 'context-v3' and preserved_name_only(issue, spans['source'], entities):
+                return {**failed, 'reason': 'audit_protected_name_fluency'}
             repair.add(issue["target"]["block_id"])
             normalized.append({**issue, "located": spans})
     except (ContentBlocked, TypeError, KeyError):
