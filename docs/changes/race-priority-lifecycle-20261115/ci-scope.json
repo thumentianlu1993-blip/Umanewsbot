@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "base_sha": "633f80ce4ffc4a5ee0361bbef7bf6805f6ab313c",
-  "reason": "本包修改赛事控制/取数队列、内部容量准入、冠军驱动完赛、部分赛果及公开状态、同源用时补齐和发布服务合同。覆盖完整受影响生命周期/多来源/结果/队列、日英法港美源回归、三种部署与恢复、PostgreSQL并发、新闻计划、公开页面和选测基础设施；未改变新闻翻译、马匹履历、研究等无关业务。规则增量只登记新模块及本次精确SHA范围，未削弱通用高风险判定。",
+  "reason": "本包修改赛事控制/取数队列、内部容量准入、冠军驱动完赛、部分赛果及公开状态、同源用时补齐和发布服务合同。覆盖完整受影响生命周期/多来源/结果/队列、日英法港美源回归、三种部署与恢复、PostgreSQL并发、新闻计划、公开页面和选测基础设施；未改变新闻翻译、马匹履历、研究等无关业务。规则增量只登记新模块及本次精确SHA范围，未削弱通用高风险判定。 补齐直接受影响的历史补采inventory到期边界模块，覆盖T+29/T+30及清单漂移。",
   "domains": [
     "race_priority_lifecycle",
     "japan_race_automation",
@@ -9,7 +9,8 @@
     "uk_race_automation",
     "us_source_collection",
     "hkjc_source_acceptance",
-    "infrastructure"
+    "infrastructure",
+    "module:stable.tests.test_race_result_recovery_application_inventory"
   ],
   "changes": [
     {
