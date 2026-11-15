@@ -353,6 +353,46 @@ class FranceResultWorkflowTests(TestCase):
         self.assertTrue(url.startswith(self.base))
         return (ROOT/('avenir-result.html' if url.endswith('arrivee-rapports') else 'avenir-card.html')).read_text()
 
+    def test_partial_result_publishes_and_checkpoint_keeps_polling(self):
+        from unittest.mock import patch
+        from stable import models
+        from stable.services.race_data_source_adapters import fetch_bound_observation, run_multisource_claim
+        from stable.services.race_data_sync_enrollment import attach_multisource_observation
+        from stable.services.race_data_sync_control import claim_multisource_events
+        from stable.services.race_events import resolve_race_live_public_read, resolve_race_live_public_reads
+        value = fetch_bound_observation(event=self.event, route=self.policy.routes[0], now=NOW, fetcher=self.fetch)
+        attach_multisource_observation(value, policy=self.policy, now=NOW)
+        for index, row in enumerate(value['roster'], 1):
+            models.RaceEventRunner.objects.create(event=self.event, sort_order=index,
+                horse_number=row['number'], horse_name=row['horse_name'],
+                source_refs={'geny':row['external_runner_id']})
+        partial = copy.deepcopy(value)
+        partial['result_phase'] = 'provisional'
+        partial['roster_complete'] = False
+        for row in partial['roster']:
+            if row['reported_finish_position'] != 1:
+                row.update(reported_finish_position=None, status='declared', finish_time='', margin='')
+        claims = claim_multisource_events(event_ids=[self.event.pk], now=NOW, historical=True)
+        self.assertEqual(len(claims), 1)
+        with patch('stable.services.race_data_source_adapters.fetch_bound_observation', return_value=partial):
+            outcome = run_multisource_claim(claim=claims[0], now=NOW, fetcher=self.fetch)
+        self.assertFalse(outcome['processed'], outcome)
+        self.assertEqual(outcome['reason'], 'result_incomplete')
+        self.assertEqual(self.event.results.count(), 1)
+        self.assertFalse(self.event.results.get().is_confirmed)
+        self.event.refresh_from_db()
+        self.assertIsNone(self.event.result_confirmed_at)
+        decision = resolve_race_live_public_read(event_id=self.event.pk, now=NOW)
+        self.assertTrue(decision.visible, decision)
+        self.assertEqual(decision.phase, 'provisional')
+        self.assertEqual(resolve_race_live_public_reads(event_ids=[self.event.pk], now=NOW)[self.event.pk], decision)
+        checkpoint = models.RaceEventLiveProviderCheckpoint.objects.get(tracking__event=self.event, data_kind='result')
+        self.assertIsNotNone(checkpoint.next_poll_at)
+        from django.template.loader import render_to_string
+        html = render_to_string('stable/public/race_detail.html', dict(event=self.event,
+            results=list(self.event.results.all()),live_result_status={'phase':'provisional'}))
+        self.assertIn('暂定赛果，仍在补齐', html)
+
     def test_independent_card_result_binding_publication_and_replay(self):
         from stable.services.race_data_source_adapters import fetch_bound_observation,run_multisource_claim
         from stable.services.race_data_sync_enrollment import attach_multisource_observation

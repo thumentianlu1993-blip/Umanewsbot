@@ -54,7 +54,7 @@ class CandidateBypassTests(TestCase):
 class CalendarFilterTests(TestCase):
     def make(self, slug, **kw):
         return models.RaceEvent.objects.create(year=2026,slug=slug,chinese_name=slug,
-            visibility_status='published',timezone_name='Asia/Shanghai',**kw)
+            visibility_status='published',country_region='japan',timezone_name='Asia/Shanghai',**kw)
 
     def test_upcoming_excludes_past_and_running(self):
         from stable.views import _public_race_calendar_base_queryset

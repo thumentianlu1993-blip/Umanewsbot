@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "base_sha": "2b01cab40cee1bf7c7a296b386a1c0a622d67c5d",
+  "reason": "仅扩展data_sync暂定结果投影与共享公开解析的data_sync分支；保留旧race-live逻辑。覆盖赛果写入/恢复/PG/多来源、法国适配器、详情模板与公开证据；规则仅登记本清单，不改选测算法。",
+  "domains": [
+    "race_results",
+    "module:stable.test_france_automation",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_race_section_gaps",
+    "module:stable.test_race_multisource_postgres",
+    "module:stable.test_race_multisource_regions",
+    "public_probe_orm_loader",
+    "public_probe_template_adapter"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/partial-race-results/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "1a1781c80d2dcee0f5cfea144feaec76495f674fcfe77b7d2244e2bed4981f0f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/partial-race-results/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "05f47420bf4948f667cee4574868103f91f9d2d105c298ede10ab8a6cbf98c6d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/partial-race-results/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "02246735a558cbfc251db1c816a8bb6daa7ea1ca4233ae67fa9123bd0b5610dd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/partial-race-results/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d96250121f781638b83ed00aa47b8588ee9aab402cd9e4e50a78b1d09340938c",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/partial-race-results/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e9e4b6ad62215aa850717d00b4ec37f4f89251400e3300229b21e44a68faa0ee",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "d748b83b802f830022311f31f7513720f3c4247a52c5de1e7e0292ece4f7614a",
+      "after_hash": "a17844b181966c14a5ba897d310460b7158760cf42b7ca5905570e1350c0b3d0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/decisions.md",
+      "status": "modified",
+      "before_hash": "1cbc5364e91369d274731cb269048f2255a6544f266bf0787b145bdabde4d939",
+      "after_hash": "0464f5c0462640e21fc4da49545a59de93928f818a26c8e8dceee516756517d7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_admission.py",
+      "status": "modified",
+      "before_hash": "83826145ed56699cb9dc4c2738bffc4068b8dddfb3e418601ba8712255a3330b",
+      "after_hash": "56925904aecb5f842ad8efc72cb88763c474babf5e2b2df7b01ea1c70de28403",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "89d97541d0518d33868ee7a70d86d6a8411f3ef0142142ecc1d8c511a1ced735",
+      "after_hash": "ad56d76715d8d03498f1713620675f844ea81f8122dbcdeb266c63d08d117684",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_events.py",
+      "status": "modified",
+      "before_hash": "8f10c637a80200f78d1d4fdcc2802314d68c3848649ab784b8084acc4786e1d1",
+      "after_hash": "6f54c13832db78a3120e31382fbb7daa32789f63b171e9ccb9f81a0575e8872b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/templates/stable/public/race_detail.html",
+      "status": "modified",
+      "before_hash": "e7175f229f946e9ed3a39efbfedee6072143227ddd3906f3e80fc2a5116ce3f8",
+      "after_hash": "39ff655a9805ee60a66d1feab4404ddfb83e15279e0f1c711d885c165dadd1a4",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_automation.py",
+      "status": "modified",
+      "before_hash": "eb48219107f74626017aa865e23e764397be5f958a552fae955af890414b0f7e",
+      "after_hash": "b856493c141280cec7cfb774d01e07a1c0631aabc320367f69ff4f206ef9aea8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "aff985f33f27f5eeac3d26e3235c78402f505ef225f56c68bde31757b3d53b35",
+      "after_hash": "11aa0585044a50a45562c7263941345b0f920ed7019b9714e879a2a50140b6ef",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_section_gaps.py",
+      "status": "modified",
+      "before_hash": "60046ef38ebd34fda3a123a6ed526b7ac42cb630bad2dccdfd6cc0a6581a950b",
+      "after_hash": "2a10cc91dbf7f858abbdb2b7a988cec053466c6aaf7b6d2824a2045127f166e6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "5dfb1021da03efbad819560478249f65acdf5a1ff6d7dcf104c2893ea7bfc2dd",
+      "after_hash": "79b459d2c1d8c9b7bf0dba524f188a34b693492ccb3e4c6d6800643e44fbf4d9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

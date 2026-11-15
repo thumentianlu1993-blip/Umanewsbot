@@ -55,6 +55,9 @@
       {% else %}
         <div class="countdown-hero-digits">{{ status_label }}{% if event.status == 'scheduled' %}<small>{% race_field event "time" event.public_time_label %}</small>{% endif %}</div>
       {% endif %}
+      {% if live_result_status.phase == "provisional" %}
+        <aside class="race-result-status" role="status">暂定赛果，仍在补齐；完整正式赛果公布后更新。</aside>
+      {% endif %}
       {% if live_result_status.is_stale %}
         <aside class="race-result-status" role="status"{% if public_probe_projection.complete %} data-o03-role="detail.result.stale"{% endif %}>数据可能已过期</aside>
       {% endif %}
