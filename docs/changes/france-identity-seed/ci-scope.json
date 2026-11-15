@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "base_sha": "2b01cab40cee1bf7c7a296b386a1c0a622d67c5d",
+  "reason": "仅为seed_evidence新增法国已校验Geny正式编号卡分支，沿用现有身份收据与原子登记；回归法国完整发布、所有现有seed消费者、强身份/多来源登记和PG并发，工具控制只新增本次领域及精确清单入口，不放宽通用高风险规则。",
+  "domains": [
+    "france_identity_seed",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/france-identity-seed/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4670a28b42d5b5e252d7e068692a41e94fcfb323a234b4c5704bd7f7fb5d979a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "46ada09b977d248328189b60fa9dca3c78f3d1b56da134df4ddca8b6117642b0",
+      "after_hash": "9cbb6957afadacae80dae8c2713e47b6b4680eb51d3ed24679a6e8d4eeac1a9b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_france_automation.py",
+      "status": "modified",
+      "before_hash": "eb48219107f74626017aa865e23e764397be5f958a552fae955af890414b0f7e",
+      "after_hash": "d9c294cb8739f4e01cbe9c2235640eb583663cb4be1823d196031e2500a77196",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "62ff05c93f5b52406993bb64ba32c0e11412847328e26a07450d58f3cda7e6c8",
+      "after_hash": "a5210553bd91912f9c75ff3e9b2d186174cca438c45c24cd7c5e4fb125342d59",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "5dfb1021da03efbad819560478249f65acdf5a1ff6d7dcf104c2893ea7bfc2dd",
+      "after_hash": "fbc72668d33bd5325ed610f8d9151d6fa25b031098b4e8f9597e1874c5290871",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
