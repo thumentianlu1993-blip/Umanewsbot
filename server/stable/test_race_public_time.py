@@ -204,3 +204,44 @@ class PublicTimeQueryPerformanceTests(TestCase):
             actual = rows()
             with patch.object(_PublicInstant, "as_postgresql", legacy):
                 self.assertEqual(rows(), actual)
+
+    def test_repeated_compilation_and_exception_cleanup(self):
+        from unittest.mock import patch
+        from django.db import connection
+        from stable.services.race_public_time import _PublicInstant
+        query = self.queryset()
+        sql, params = query.query.sql_with_params()
+        self.assertEqual(query.query.sql_with_params(), (sql, params))
+        with patch.object(_PublicInstant, "as_postgresql", side_effect=ValueError("compile-test")):
+            if connection.vendor == "postgresql":
+                with self.assertRaisesRegex(ValueError, "compile-test"):
+                    query.query.sql_with_params()
+        self.assertEqual(query.query.sql_with_params(), (sql, params))
+        self.assertEqual(len(list(query)), 80)
+        plain_sql, _ = RaceEvent.objects.values("pk").query.sql_with_params()
+        self.assertNotIn("pg_timezone_names", plain_sql)
+        self.assertNotIn("__umanews_public_timezones", plain_sql)
+        stripped_sql, _ = annotate_public_time(RaceEvent.objects.all()).values("pk").query.sql_with_params()
+        self.assertNotIn("pg_timezone_names", stripped_sql)
+
+    def test_combined_and_correlated_query_share_directory(self):
+        import json
+        from django.db import connection
+        from django.db.models import OuterRef, Subquery
+        if connection.vendor != "postgresql":
+            self.skipTest("PostgreSQL 执行计划")
+        query = self.queryset()
+        inner = query.filter(pk=OuterRef("pk")).values("public_date")[:1]
+        queries = [
+            query.annotate(inner_day=Subquery(inner)).values("pk", "public_date", "inner_day"),
+            query.order_by().values("pk", "public_date").union(
+                query.filter(pk__lt=0).order_by().values("pk", "public_date")),
+        ]
+        def scans(node):
+            return ([node] if node.get("Function Name") == "pg_timezone_names" else []) + [
+                found for child in node.get("Plans", []) for found in scans(child)]
+        for candidate in queries:
+            with self.subTest(query=str(candidate.query)[:90]):
+                found = scans(json.loads(candidate.explain(format="json", analyze=True))[0]["Plan"])
+                self.assertEqual(len(found), 1)
+                self.assertEqual(found[0]["Actual Loops"], 1)

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "base_sha": "67a9793997d1d57944842d22053d89b3c5a73d96",
+  "reason": "只在annotate_public_time克隆Query及其专用SELECT编译器复用单语句时区名称目录；不改全站backend、模型、任务、权限或时间合同。覆盖首页/日历/分页/年份/公开可见性全部消费者、PostgreSQL实际计划及SQLite兼容；工具规则仅新增本次精确字节范围登记，以infrastructure和core回归验证，不放宽任何通用高风险规则。",
+  "domains": [
+    "module:stable.test_race_public_time",
+    "module:stable.test_pre_race_refresh",
+    "module:stable.test_race_calendar_default_date_window",
+    "module:stable.test_race_information_display_pages",
+    "module:stable.test_historical_race_calendar_integrity",
+    "module:stable.test_race_news_exposure",
+    "module:stable.test_public_new_regions",
+    "module:stable.test_race_calendar_responsive_ui",
+    "module:stable.test_race_information_display",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/public-time-query-performance/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "da63a333326ead9db5da482dc23693266ac8c0150625634613d92a693b1ef596",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/public-time-query-performance/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "53ea3570e51d2fcaef78885c2b4da6a88d99637d63a403b1bff986159ace43a8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/public-time-query-performance/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "8e350376e4f87af15a327ccfae05fe2d937d489dcaa3b8e8450f6f7955d15aa7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/public-time-query-performance/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "125e7a6eec8fa0324c978abe119bd4fca09a1d2d0a6bdcc83bef71539dcc50f6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/public-time-query-performance/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "86936807a83f8f82396ebd0ad9b03d956b36885b74b9895ff5ec28f92695bb42",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/public-time-query-performance/validation.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "58e9070e3648ffaaf5bddd60f8acf4223ba94279982d0e68236a7bf31911e9af",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "e56b8717faa56a8d6b1399e8b4ba88d5a05974510fb5f726e48e62fe3717f79f",
+      "after_hash": "72f3bf431d4c0c5972023c47749746039824433236477adb390036a4570631e7",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_public_time.py",
+      "status": "modified",
+      "before_hash": "16b2968fc07cb3759c85a7e75ef1331d688bd5dc46e6627f599ad51dfff4c2db",
+      "after_hash": "5cf1737d04397de1dbe99fc9bd6841409b3c1d6d04f0049d581b906b7ec709bc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_public_time.py",
+      "status": "modified",
+      "before_hash": "e53ec505d9eeb9dae141b839a9e74c71032824babf3ba837d49d4894c7c5a260",
+      "after_hash": "8d419a1b49a45e5a8244f69f71ded1258336f748f5bbe5d6cf29a6d93d7ff7de",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "30bc2a73f9d5fe1f2e03480784732e3b15ddf47216d055e059c28a8a33bd1ac1",
+      "after_hash": "cbab4092d2aeb24daf9ebd52eb555b469a04581689b8dc7984ce9da0a1557bf8",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

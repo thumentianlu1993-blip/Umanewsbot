@@ -1,3 +1,7 @@
+## 2026-11-15 公开时间 SQL 性能修复实现中
+
+用户已批准完整实现流程。独立分支 `codex/public-time-query-performance` 已整合主线 `67a97939`，为公开时间 SELECT 定点增加单次物化时区名称目录；不改变时间/公开/分页合同，不缓存赛事。真实 PostgreSQL RED 为15次目录函数扫描，同例及10项时间/ORM测试GREEN，嵌套与union仅一次扫描。固定树范围回归、独立review和交付包正在准备；尚未合并或发布，字体及Nginx/robots保持。见[验证记录](changes/public-time-query-performance/validation.md)。
+
 ## 2026-11-15 P04-1 赛事名称开始正式交付准备
 
 ## 2026-11-15 赛事实时生命周期候选（未发布）
