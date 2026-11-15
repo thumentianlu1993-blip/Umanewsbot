@@ -372,6 +372,8 @@ class FranceResultWorkflowTests(TestCase):
         for row in partial['roster']:
             if row['reported_finish_position'] != 1:
                 row.update(reported_finish_position=None, status='declared', finish_time='', margin='')
+        winner = next(row for row in partial['roster'] if row['reported_finish_position'] == 1)
+        winner['field_provenance']['win_odds'] = '3.5'
         claims = claim_multisource_events(event_ids=[self.event.pk], now=NOW, historical=True)
         self.assertEqual(len(claims), 1)
         with patch('stable.services.race_data_source_adapters.fetch_bound_observation', return_value=partial):
@@ -392,6 +394,22 @@ class FranceResultWorkflowTests(TestCase):
         html = render_to_string('stable/public/race_detail.html', dict(event=self.event,
             results=list(self.event.results.all()),live_result_status={'phase':'provisional'}))
         self.assertIn('暂定赛果，仍在补齐', html)
+
+        # 第二次快照新增名次但缺少已公开赔率：保留上一版并继续补采。
+        from datetime import timedelta
+        next_partial = copy.deepcopy(value)
+        next_partial['result_phase'] = 'provisional'
+        next_partial['roster_complete'] = False
+        for row in next_partial['roster']:
+            row['field_provenance'].pop('win_odds', None)
+        later = checkpoint.next_poll_at + timedelta(seconds=1)
+        with patch('django.utils.timezone.now', return_value=later), patch(
+                'stable.services.race_data_source_adapters.fetch_bound_observation', return_value=next_partial):
+            claims = claim_multisource_events(event_ids=[self.event.pk], now=later, historical=True)
+            self.assertEqual(len(claims), 1)
+            run_multisource_claim(claim=claims[0], now=later, fetcher=self.fetch)
+        self.assertEqual(self.event.results.count(), 1)
+        self.assertEqual(self.event.results.get().odds_value, '3.5')
 
     def test_independent_card_result_binding_publication_and_replay(self):
         from stable.services.race_data_source_adapters import fetch_bound_observation,run_multisource_claim

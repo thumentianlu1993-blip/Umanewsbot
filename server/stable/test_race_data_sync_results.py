@@ -473,6 +473,22 @@ class RaceDataSyncResultApplicationTests(TestCase):
         self.assertEqual(self.event.results.count(), 2)
         self.assertEqual(models.RaceEventRevision.objects.get(pk=decision.revision_id).items.get(reported_finish_position=1).participant_id, participant)
 
+    def test_partial_refresh_cannot_erase_previously_known_popularity(self):
+        source = self._source("jra", "official_operator", "jra-result")
+        rows = self._rows()[:1]
+        rows[0]['field_provenance'] = {'source_fields': {'popularity': '2'}}
+        first = self._observation(source, 'official_operator', rows, result_phase='provisional')
+        initial = apply_data_sync_result_observation(observation_id=first.pk, expected_event_id=self.event.pk,
+            now=NOW, project_current=True, correction_apply_enabled=False)
+        self.assertTrue(initial.projected, initial)
+        self.assertEqual(self.event.results.get().popularity, '2')
+        next_observation = self._observation(source, 'official_operator', self._rows(),
+                                            result_phase='provisional', observed_at=NOW + timedelta(minutes=1))
+        decision = apply_data_sync_result_observation(observation_id=next_observation.pk, expected_event_id=self.event.pk,
+            now=NOW + timedelta(minutes=1), project_current=True, correction_apply_enabled=False)
+        self.assertEqual(decision.reason_code, 'provisional_result_regression')
+        self.assertEqual(self.event.results.get().popularity, '2')
+
     def test_partial_refresh_cannot_erase_previously_known_time(self):
         rows = self._rows()[:1]
         rows[0]['finish_time'] = '1:30.0'

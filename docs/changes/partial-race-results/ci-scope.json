@@ -25,7 +25,7 @@
       "path": "docs/changes/partial-race-results/rollout.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "05f47420bf4948f667cee4574868103f91f9d2d105c298ede10ab8a6cbf98c6d",
+      "after_hash": "20a472bae25109fbe3ca740b311d74eae9397e3eb0b9cff0074e1deae221b90d",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -49,7 +49,7 @@
       "path": "docs/changes/partial-race-results/test_cases.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "e9e4b6ad62215aa850717d00b4ec37f4f89251400e3300229b21e44a68faa0ee",
+      "after_hash": "ef47b365f096225c4c2e88deaeff69568dea7a8129d4f9b324ada3028054b1e8",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -81,7 +81,7 @@
       "path": "server/stable/services/race_data_sync_results.py",
       "status": "modified",
       "before_hash": "89d97541d0518d33868ee7a70d86d6a8411f3ef0142142ecc1d8c511a1ced735",
-      "after_hash": "ad56d76715d8d03498f1713620675f844ea81f8122dbcdeb266c63d08d117684",
+      "after_hash": "740025d991e88e83e6e4d29d038a73ccf98bc43661ca695bac828b6486a3de10",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -105,7 +105,7 @@
       "path": "server/stable/test_france_automation.py",
       "status": "modified",
       "before_hash": "eb48219107f74626017aa865e23e764397be5f958a552fae955af890414b0f7e",
-      "after_hash": "b856493c141280cec7cfb774d01e07a1c0631aabc320367f69ff4f206ef9aea8",
+      "after_hash": "6a043def764e2f91d5b96d95b26578e97f428f696c7549a2605f2ad063fae7ba",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -113,7 +113,7 @@
       "path": "server/stable/test_race_data_sync_results.py",
       "status": "modified",
       "before_hash": "aff985f33f27f5eeac3d26e3235c78402f505ef225f56c68bde31757b3d53b35",
-      "after_hash": "11aa0585044a50a45562c7263941345b0f920ed7019b9714e879a2a50140b6ef",
+      "after_hash": "bc7466f44dbdb2d72125f2666b97b994c0875b02c6d586349bb188b6aa935c77",
       "before_mode": "100644",
       "after_mode": "100644"
     },

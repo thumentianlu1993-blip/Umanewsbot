@@ -60,6 +60,16 @@ class DataSyncResultApplyDecision:
     projected: bool = False
 
 
+def _result_market_fields(source, provenance):
+    """写入与暂定回退检查共用同一公开赔率/人气解释。"""
+    odds = (result_odds(provenance) if hkjc_source(source)
+            else france_odds(provenance) if france_source(source)
+            else us_odds(provenance) if us_source(source)
+            else uk_odds(provenance) if uk_source(source) else "")
+    return {"popularity": result_popularity(provenance) if japan_source(source) else "",
+            "odds_value": odds}
+
+
 def _apply_france_basic(event, source, observation, source_class, now):
     from .france_basic_fields import apply_basic_locked, ALLOWED_FIELDS
     from .race_data_sync_pipeline import RaceDataSyncFlags, _audit_defaults
@@ -804,12 +814,16 @@ def apply_data_sync_result_observation(
                 "barrier": "barrier", "carried_weight": "carried_weight",
                 "jockey_name": "jockey_name", "trainer_name": "trainer_name",
             }
+            previous_source = current.primary_observation.source_identity
             for item in current.items.all():
                 row = candidate_rows.get(item.participant_id)
                 if row is None or any(
                     getattr(item, old_field) and not row[new_field]
                     for old_field, new_field in published_fields.items()
-                ):
+                ) or (row is not None and any(
+                    old_value and not _result_market_fields(source, row["field_provenance"])[key]
+                    for key, old_value in _result_market_fields(previous_source, item.field_provenance).items()
+                )):
                     # 保留上次已公开快照，继续补采；不拼接无法逐字段归因的混合版本。
                     return DataSyncResultApplyDecision("rejected", "provisional_result_regression", current.pk, True)
         current_observation = (
@@ -1211,8 +1225,7 @@ def apply_data_sync_result_observation(
                         barrier=item.barrier,
                         carried_weight=item.carried_weight,
                         running_status=item.status,
-                        popularity=result_popularity(item.field_provenance) if japan_source(source) else "",
-                        odds_value=result_odds(item.field_provenance) if hkjc_source(source) else france_odds(item.field_provenance) if france_source(source) else us_odds(item.field_provenance) if us_source(source) else uk_odds(item.field_provenance) if uk_source(source) else "",
+                        **_result_market_fields(source, item.field_provenance),
                         is_confirmed=terminal_phase,
                         source_refs={
                             "source_key": source.source_key,
