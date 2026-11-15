@@ -1068,6 +1068,20 @@
     ],
     "module:stable.test_race_priority_lifecycle": [
       "stable.test_race_priority_lifecycle"
+    ],
+    "france_identity_seed": [
+      "stable.test_france_automation",
+      "stable.test_france_release_handoff",
+      "stable.test_race_multisource_identity",
+      "stable.test_race_multisource_enrollment",
+      "stable.test_race_multisource_conversion",
+      "stable.test_race_multisource_regions",
+      "stable.test_race_multisource_postgres",
+      "stable.test_race_multisource_jra",
+      "stable.test_japan_automation",
+      "stable.test_hkjc_automation",
+      "stable.test_us_release",
+      "stable.test_pre_race_refresh"
     ]
   },
   "dependencies": {

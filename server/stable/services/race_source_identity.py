@@ -194,7 +194,7 @@ def seed_evidence(event, *, candidate_id=None, route=None):
     for candidate in qs.order_by("-fetched_at", "-id")[:10]:
         if route and not route.permits_url(candidate.source_url):
             continue
-        for key in ("jra_pre_race_v1", "nar_pre_race_v1", "hkjc_pre_race_v1", "reviewed_pre_race_v1", "pre_race_refresh_v1"):
+        for key in ("jra_pre_race_v1", "nar_pre_race_v1", "hkjc_pre_race_v1", "france_pre_race_v1", "reviewed_pre_race_v1", "pre_race_refresh_v1"):
             meta = (candidate.raw_payload or {}).get(key, {})
             if meta.get("validated") is not True or meta.get("baseline") != baseline(
                 event
@@ -209,6 +209,25 @@ def seed_evidence(event, *, candidate_id=None, route=None):
                 isinstance(r, dict) and r.get("horse_name") for r in items
             ):
                 continue
+            if key == "france_pre_race_v1":
+                # 法国报名/候补名单不授予身份，只接纳已校验的 Geny 正式编号卡。
+                from .france_sources import geny_key
+
+                payload = candidate.candidate_payload or {}
+                numbers = [str(r.get("horse_number", "")) for r in items]
+                if (event.country_region != "france" or meta.get("stage") != "numbered"
+                        or payload.get("stage") != "numbered"
+                        or not all(n.isdigit() and int(n) > 0 for n in numbers)
+                        or len(set(numbers)) != len(numbers)):
+                    continue
+                try:
+                    source_key = geny_key(candidate.source_url)
+                except ValueError:
+                    continue
+                if (source_key[4] != "partants-pronostics"
+                        or source_key[2] != str(event.local_date)
+                        or source_key[1] != payload.get("external_race_id")):
+                    continue
             if key == "nar_pre_race_v1":
                 # 预计名单/候补不能授予身份；只接纳已校验的完整编号正式卡。
                 numbers = [str(r.get("horse_number", "")) for r in items]

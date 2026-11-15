@@ -640,3 +640,69 @@ class FranceWholeScopeTests(TestCase):
 
             self.assertEqual(models.RaceEventProductCanonicalLink.objects.get().canonical_event_id,784)
             self.assertEqual(execute(root/'manifest.json',sha,now=NOW,approved_by_id=actor.pk,apply=True)['action'],'replay')
+
+
+class FranceIdentitySeedTests(FranceResultWorkflowTests):
+    """冻结真实赛卡验证首次身份登记，不借已有系列别名通过。"""
+    def setUp(self):
+        super().setUp()
+        from stable import models
+        from stable.services.france_sources import parse_geny_observation
+        from stable.services.race_pre_race import baseline
+        self.event.race_series = None
+        self.event.save(update_fields=['race_series'])
+        card = parse_geny_observation(self.fetch(self.base+'partants-pronostics'),
+            url=self.base+'partants-pronostics',route=self.policy.routes[0],now=NOW)
+        self.candidate = models.RaceEventDataCandidate.objects.create(event=self.event,
+            module='runners',source_name='france_pre_race_v1',source_url=self.base+'partants-pronostics',
+            candidate_payload=dict(stage='numbered',external_race_id=card['external_race_id'],
+                items=[dict(horse_number=r['number'],horse_name=r['horse_name']) for r in card['roster']]),
+            raw_payload={'france_pre_race_v1':dict(validated=True,stage='numbered',
+                baseline=baseline(self.event),raw_sha256=card['raw_sha256'])},fetched_at=NOW)
+
+    def test_independent_card_result_binding_publication_and_replay(self):
+        super().test_independent_card_result_binding_publication_and_replay()
+        from stable.services.race_data_source_adapters import fetch_bound_observation
+        from stable.services.race_data_sync_enrollment import attach_multisource_observation
+        self.assertIsNotNone(self.event.result_confirmed_at)
+        before = (self.event.results.count(), self.event.revisions.count(), self.event.source_identities.count())
+        value = fetch_bound_observation(event=self.event, route=self.policy.routes[0], now=NOW, fetcher=self.fetch)
+        decision = attach_multisource_observation(value, policy=self.policy, now=NOW)
+        self.assertEqual(decision.action, 'replay', decision)
+        self.assertEqual(before, (self.event.results.count(), self.event.revisions.count(), self.event.source_identities.count()))
+
+    def test_seed_receipt_resolves_without_existing_binding(self):
+        from stable.services.race_source_identity import seed_evidence,resolve_observation
+        from stable.services.race_data_source_adapters import fetch_bound_observation
+        seed=seed_evidence(self.event,route=self.policy.routes[0])
+        self.assertIsNotNone(seed)
+        self.assertEqual(seed['candidate_id'],self.candidate.pk)
+        value=fetch_bound_observation(event=self.event,route=self.policy.routes[0],now=NOW,fetcher=self.fetch)
+        self.assertEqual(value['identity_seed_receipt']['candidate_id'],self.candidate.pk)
+        self.assertEqual(resolve_observation(value,route=self.policy.routes[0],now=NOW).event_id,self.event.pk)
+
+    def test_invalid_france_seed_is_rejected(self):
+        from stable.services.race_source_identity import seed_evidence
+        original=copy.deepcopy(self.candidate)
+        cases=['registration','declared','blank_number','duplicate_number','wrong_url','wrong_id','wrong_date','unvalidated','baseline','hash','region']
+        for case in cases:
+            with self.subTest(case=case):
+                self.candidate=copy.deepcopy(original)
+                meta=self.candidate.raw_payload['france_pre_race_v1']
+                payload=self.candidate.candidate_payload
+                if case in ('registration','declared'):meta['stage']=payload['stage']=case
+                if case=='blank_number':payload['items'][0]['horse_number']=''
+                if case=='duplicate_number':payload['items'][1]['horse_number']=payload['items'][0]['horse_number']
+                if case=='wrong_url':self.candidate.source_url='https://www.france-galop.com/fr/course/detail/test'
+                if case=='wrong_id':payload['external_race_id']='99999'
+                if case=='wrong_date':self.candidate.source_url=self.candidate.source_url.replace('2026-11-02','2026-11-03')
+                if case=='unvalidated':meta['validated']=False
+                if case=='baseline':meta['baseline']['date']='2026-11-03'
+                if case=='hash':meta['raw_sha256']='invalid'
+                self.event.country_region='japan' if case=='region' else 'france'
+                self.event.save(update_fields=['country_region'])
+                if case=='region':
+                    from stable.services.race_pre_race import baseline
+                    meta['baseline']=baseline(self.event)
+                self.candidate.save()
+                self.assertIsNone(seed_evidence(self.event,route=self.policy.routes[0]))
