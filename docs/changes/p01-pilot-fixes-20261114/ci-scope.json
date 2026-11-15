@@ -32,6 +32,14 @@
       "after_mode": "100644"
     },
     {
+      "path": "docs/changes/p01-pilot-fixes-20261114/audit_improvement_result.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e535f46538ced3bee167e1dfb1e5402569d81fc5b339a5df80b14e654730d745",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
       "path": "docs/changes/p01-pilot-fixes-20261114/design.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -99,7 +107,7 @@
       "path": "docs/changes/p01-pilot-fixes-20261114/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "6f551c1e9343d3e1a3ea807271d40cacefb8d25f99c45f0567f62a24f667a3a3",
+      "after_hash": "a8156e9e69579ee90a406c7694adecaab9b5531283ed945fbe48bcc837d8159d",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -123,7 +131,7 @@
       "path": "docs/current_state.md",
       "status": "modified",
       "before_hash": "7bbf17b36671c9166197ee2979a2ef588daa7d2b2736040472dbab965b93c1f0",
-      "after_hash": "be40bbbf89ea98884c12ec933ab82fd639063f8b36f33ce97e6115338c51b5dc",
+      "after_hash": "b728bbeb733ab3256be874cd856c503f3f739ac3e17e5512b986340caadba20c",
       "before_mode": "100644",
       "after_mode": "100644"
     },
