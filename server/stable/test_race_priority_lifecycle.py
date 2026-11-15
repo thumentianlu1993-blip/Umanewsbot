@@ -80,6 +80,11 @@ class PriorityRoutingTests(SimpleTestCase):
         self.assertEqual(retry_delay(priority=True, reason="timeout"), timedelta(minutes=1))
         self.assertEqual(retry_delay(priority=True, reason="http_403"), timedelta(hours=1))
 
+    def test_background_budget_retries_at_utc_reset(self):
+        from stable.services.race_priority import retry_delay
+        self.assertEqual(retry_delay(priority=False, reason="artifact_daily_requests_exceeded", now=NOW),
+                         timedelta(hours=17))
+
     def test_control_tasks_use_dedicated_queue(self):
         for task in (
             "select_due_race_data_sync_task", "scan_due_race_event_lifecycle_task",

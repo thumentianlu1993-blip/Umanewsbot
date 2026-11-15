@@ -1054,7 +1054,7 @@ def build_race_calendar_refresh_beat_schedule(*, refresh_enabled: bool = False) 
         schedule["race-calendar-refresh-diff-candidates"] = {
             "task": "stable.tasks.race_calendar_refresh_dry_run_task",
             "schedule": crontab(minute=42, hour=3),
-            "options": {"queue": "race_control", "expires": 3300},
+            "options": {"queue": "celery", "expires": 3300},
         }
     return schedule
 

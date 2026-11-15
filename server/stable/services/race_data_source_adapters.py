@@ -752,7 +752,7 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
             verified_uk = validate_final_roster(value)
         value["roster_complete"] = bool(
             value.get("roster_complete") and
-            ((verified_incidents or verified_us or verified_uk) and not expected) or expected
+            (((verified_incidents or verified_us or verified_uk) and not expected) or expected
             and (
                 sorted(expected) == sorted(actual)
                 or (
@@ -762,7 +762,7 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
                     and event.runners.exists()
                     and sorted(n for n, _ in expected) == sorted(n for n, _ in actual)
                 )
-            )
+            ))
         )
     if previous and not source:
         value["identity_seed_receipt"] = seed_receipt(
