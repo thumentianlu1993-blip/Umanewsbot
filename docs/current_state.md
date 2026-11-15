@@ -1,3 +1,7 @@
+## 2026-11-15 公开时间 SQL 性能修复已完成实现与本地验收
+
+独立分支 `codex/public-time-query-performance` 基于主线 `67a97939`，为公开时间 SELECT 定点增加单次物化时区名称目录；不改变时间/公开/分页合同，不缓存赛事。真实 PostgreSQL RED 为15次目录函数扫描，优化后投影/相关子查询/union均仅一次。候选 `278dc38b` 的370项固定树隔离范围测试全部通过、零跳过，独立只读review未发现需修正项。[Draft PR #321](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/321) 已建立，最终远端检查以当前head为准。尚未合并或发布；生产只读快照仍运行 `f19c7f2d`，发布依赖PR #320完成上线并冻结新基线，不能混入未上线变更。字体及Nginx/robots保持。见[验证记录](changes/public-time-query-performance/validation.md)和[交付依赖](changes/public-time-query-performance/rollout.md)。
+
 ## 2026-11-15 P04-1 赛事名称开始正式交付准备
 
 ## 2026-11-15 赛事实时生命周期候选（未发布）

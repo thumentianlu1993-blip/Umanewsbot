@@ -1,11 +1,53 @@
 """公开北京日期/赛时合同：不修改来源身份时间，不推断缺失时区。"""
 from dataclasses import dataclass
+from contextvars import ContextVar
 from datetime import date, datetime, time, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+from django.db import connections
 from django.db.models import Case, When, F, Func, DateTimeField, DateField
 from django.db.models.functions import Coalesce, TruncDate, TruncTime
+from django.db.models.sql import Query
+from django.db.models.sql.compiler import SQLCompiler
 
 BEIJING = ZoneInfo('Asia/Shanghai')
+
+# 只在公开时间 SELECT 的编译期间复用目录；不跨 SQL 缓存业务数据或时区信息。
+_TIMEZONE_CTE = '"__umanews_public_timezones"'
+_timezone_scope = ContextVar('umanews_public_time_compile_scope', default=None)
+
+
+class _PublicTimeSQLCompiler(SQLCompiler):
+    def as_sql(self, *args, **kwargs):
+        if _timezone_scope.get() is not None:
+            return super().as_sql(*args, **kwargs)
+        scope = {"used": False}
+        token = _timezone_scope.set(scope)
+        try:
+            sql, params = super().as_sql(*args, **kwargs)
+            if sql and scope["used"]:
+                # Django 已将 EXPLAIN 放到 SELECT 前；它必须位于 WITH 外层。
+                explain_prefix = ''
+                if self.query.explain_info:
+                    info = self.query.explain_info
+                    explain_prefix = self.connection.ops.explain_query_prefix(
+                        info.format, **info.options
+                    ) + ' '
+                    sql = sql.removeprefix(explain_prefix)
+                sql = (f"WITH {_TIMEZONE_CTE} AS MATERIALIZED "
+                       f"(SELECT name FROM pg_timezone_names) {sql}")
+                sql = explain_prefix + sql
+            return sql, params
+        finally:
+            _timezone_scope.reset(token)
+
+
+class _PublicTimeQuery(Query):
+    def get_compiler(self, using=None, connection=None, elide_empty=True):
+        if connection is None:
+            connection = connections[using]
+        if connection.vendor == 'postgresql':
+            return _PublicTimeSQLCompiler(self, connection, using, elide_empty)
+        return super().get_compiler(using, connection, elide_empty)
 
 @dataclass(frozen=True)
 class PublicTime:
@@ -53,7 +95,12 @@ class _PublicInstant(Func):
         # All arguments are model-column expressions, not interpolated values.
         if any(params for _,params in parts): raise ValueError('public_time_requires_columns')
         instant,day,clock,zone=[sql for sql,_ in parts]
-        known=f"{zone} IN (SELECT name FROM pg_timezone_names)"
+        scope = _timezone_scope.get()
+        if scope is not None:
+            scope["used"] = True
+        # 非专用 SELECT（例如 Django 的 UPDATE compiler）仍可独立编译表达式。
+        directory = _TIMEZONE_CTE if scope is not None else 'pg_timezone_names'
+        known=f"{zone} IN (SELECT name FROM {directory})"
         safe_zone=f"CASE WHEN {known} THEN {zone} ELSE 'UTC' END"
         local=f"({instant} AT TIME ZONE ({safe_zone}))"
         sql=f"""CASE WHEN {instant} IS NOT NULL THEN
@@ -77,6 +124,8 @@ class _PublicInstant(Func):
 
 
 def annotate_public_time(queryset):
+    queryset = queryset.all()
+    queryset.query = queryset.query.chain(klass=_PublicTimeQuery)
     return queryset.annotate(public_instant=_PublicInstant(F('race_datetime'),F('local_date'),F('local_start_time'),F('timezone_name'))).annotate(
         public_date=Coalesce(TruncDate('public_instant',tzinfo=BEIJING),Case(
             # date-only 赛事（无 UTC 时刻、无当地开赛时刻）按当地赛日参与公开日期窗口；
