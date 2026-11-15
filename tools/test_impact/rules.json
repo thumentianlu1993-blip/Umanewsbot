@@ -1001,6 +1001,7 @@
     "deploy/docker/start-race-priority-worker.sh"
   ],
   "paths": {
+    "server/stable/services/race_result_roster_reconciliation.py": ["race_result_roster_reconciliation"],
     "docs/changes/next-version-capabilities/lanes/C/U01-offline-cases.json": [
       "module:stable.test_race_information_display_pages",
       "module:stable.test_race_information_display",
