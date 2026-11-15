@@ -48,26 +48,16 @@ def decide_data_sync_lifecycle(
         )
     if timezone.is_naive(event.race_datetime):
         raise ValueError("race_datetime must be timezone-aware")
-    finish_at = event.race_datetime + timedelta(minutes=30)
-    if now >= finish_at:
-        return DataSyncLifecycleDecision(
-            to_status=models.RaceEventStatus.FINISHED,
-            reason_code=(
-                "data_sync_late_admission_finish"
-                if event.status == models.RaceEventStatus.SCHEDULED
-                else "data_sync_time_t_plus_30"
-            ),
-        )
     if now >= event.race_datetime and event.status == models.RaceEventStatus.SCHEDULED:
         return DataSyncLifecycleDecision(
             to_status=models.RaceEventStatus.RUNNING,
             reason_code="data_sync_time_reached_post",
-            next_refresh_at=finish_at,
+            next_refresh_at=now + timedelta(minutes=1),
         )
     next_refresh = (
         event.race_datetime
         if event.status == models.RaceEventStatus.SCHEDULED
-        else finish_at
+        else now + timedelta(minutes=1)
     )
     return DataSyncLifecycleDecision(
         reason_code="not_due",
@@ -117,7 +107,6 @@ def apply_data_sync_lifecycle_decision(
         )
         if not isinstance(evidence, dict):
             return ApplyResult(action="noop", reason_code="lifecycle_evidence_drift")
-        pre_status = admission.event.status if admission.event is not None else ""
         result = apply_race_lifecycle_decision(
             event_id=event_id,
             expected_generation=expected_generation,
@@ -126,21 +115,6 @@ def apply_data_sync_lifecycle_decision(
             registry_authorized=True,
             registry_transition_metadata={"race_data_sync": dict(evidence)},
         )
-        if (
-            result.action == "applied"
-            and pre_status == models.RaceEventStatus.SCHEDULED
-            and models.RaceEvent.objects.filter(
-                pk=event_id, status=models.RaceEventStatus.FINISHED
-            ).exists()
-        ):
-            transition = (
-                models.RaceEventLifecycleTransition.objects.filter(event_id=event_id)
-                .order_by("-id")
-                .first()
-            )
-            if transition is not None and transition.reason_code == "time_t_plus_30":
-                transition.reason_code = "data_sync_late_admission_finish"
-                transition.save(update_fields=("reason_code", "updated_at"))
         return result
 
 

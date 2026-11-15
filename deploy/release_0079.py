@@ -319,7 +319,7 @@ def prepare(env, *, resume):
             actual = {
                 service: probe(service, env)["running"] for service in contract.SERVICES
             }
-            if actual != intent["restore_services"]:
+            if actual != manifest.get("initial_services", intent["restore_services"]):
                 raise ValueError(
                     "0079 cannot prove preparation stopped before the first service action"
                 )
@@ -353,7 +353,11 @@ def prepare(env, *, resume):
             raise ValueError(
                 "manual 0079 release requires stopped application services"
             )
-        restore = {service: values["running"] for service, values in services.items()}
+        initial_services = {service: values["running"] for service, values in services.items()}
+        restore = dict(initial_services)
+        # 正常在线升级首次引入两个常驻 worker；manual-release 仍保留停服意图。
+        if origin["handoff_action"] == "deploy" and (restore["worker"] or restore["beat"]):
+            restore.update(race_control_worker=True, race_realtime_worker=True)
         if os.path.lexists(manifest_path):
             if not resume or not env.get("RELEASE_0079_RECOVERY_MANIFEST_SHA256"):
                 raise ValueError(
@@ -364,6 +368,7 @@ def prepare(env, *, resume):
             )
             if (
                 manifest["restore_services"] != restore
+                or manifest.get("initial_services", manifest["restore_services"]) != initial_services
                 or manifest["config_sha256"] != config_sha()
             ):
                 raise ValueError("0079 cannot prove the original preparation boundary")
@@ -473,7 +478,7 @@ def prepare(env, *, resume):
                     toc.encode("utf-8")
                 ).hexdigest(),
                 "pg_restore_list_line_count": len(toc.splitlines()),
-                "restore_services": restore,
+                "restore_services": restore, "initial_services": initial_services,
                 "config_sha256": config_sha(),
                 "writer_flags": original_flags,
                 "effective_compose_sha256": effective_sha,
@@ -541,7 +546,7 @@ def finish(env, intent_path, intent, receipt):
     for service in (
         "web",
         "worker",
-        "race_sync_v2_worker",
+        "race_sync_v2_worker", "race_control_worker", "race_realtime_worker",
         "race_live_worker",
         "beat",
         "nginx",
@@ -644,7 +649,7 @@ def release(env, *, resume=False):
             compose(["stop", "beat"], env)
         nodes = [
             current[service]["node"]
-            for service in ("worker", "race_live_worker", "race_sync_v2_worker")
+            for service in ("worker", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker")
             if current[service]["running"]
         ]
         if nodes:
@@ -652,7 +657,7 @@ def release(env, *, resume=False):
                 [ROOT / "deploy/wait_for_celery_drain.sh"],
                 env={**env, "EXPECTED_CELERY_WORKERS": " ".join(nodes)},
             )
-        for service in ("worker", "race_live_worker", "race_sync_v2_worker", "web"):
+        for service in ("worker", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "web"):
             if probe(service, env)["running"]:
                 compose(["stop", service], env)
         if any(

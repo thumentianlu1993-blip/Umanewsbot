@@ -113,6 +113,15 @@ class UKWorkflowTests(TestCase):
         self.assertTrue(field.text)
 
     def test_incomplete_result_does_not_create_public_rows(self):
+        complete = fetch_bound_observation(event=self.event, route=self.route, now=NOW, fetcher=self.fetch)
+        attached = attach_multisource_observation(complete, policy=self.policy, now=NOW)
+        self.assertEqual(attached.action, 'acquired')
         self.result['runners'].pop()
-        with self.assertRaises(ValueError):self.publish()
+        claims = claim_multisource_events(event_ids=[self.event.pk], now=NOW, historical=True)
+        self.assertEqual(len(claims), 1)
+        outcome = run_multisource_claim(claim=claims[0], now=NOW, fetcher=self.fetch)
+        self.assertFalse(outcome['processed'])
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, 'finished')
+        self.assertIsNone(self.event.result_confirmed_at)
         self.assertFalse(self.event.results.exists())

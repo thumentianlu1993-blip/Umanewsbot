@@ -140,6 +140,16 @@ class MultisourceClaimTests(TestCase):
             enrollment.source_set_manifest["selected"]["result"], alternate
         )
 
+    def test_partial_result_can_switch_to_authorized_alternate(self):
+        from stable.services.race_data_sync_control import finish_multisource_claim
+        attach_multisource_observation(observation("alternate"), policy=self.policy, now=NOW)
+        claim = self.claim()[0]
+        finish_multisource_claim(claim=claim, now=NOW, success=False, reason_code="result_incomplete")
+        enrollment = models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        alternate = enrollment.source_set_manifest["alternate"]["result"]["binding_id"]
+        next_claim = self.claim()[0]
+        self.assertEqual(next_claim.checkpoint_plan[0]["authority"]["binding_id"], alternate)
+
     def test_date_only_result_polls_without_fabricated_time(self):
         from stable.services.race_data_sync_control import (
             calculate_multisource_next_poll,

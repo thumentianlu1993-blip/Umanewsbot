@@ -24,6 +24,7 @@ from django.db.models import Exists, Min, OuterRef, Q
 
 from stable import models
 from stable.services.race_data_sync_policy import calculate_next_poll_at
+from stable.services.race_priority import due_priority
 
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
@@ -1825,7 +1826,8 @@ def claim_due_enrollments(
             )
             .annotate(has_enabled_due_checkpoint=Exists(enabled_due_checkpoints))
             .filter(has_enabled_due_checkpoint=True)
-            .order_by("live_tracking__next_poll_at", "id")[
+            .annotate(_race_priority=due_priority(now=now))
+            .order_by("_race_priority", "live_tracking__next_poll_at", "id")[
                 : max(0, batch_size - len(claims))
             ]
         )
@@ -1914,6 +1916,9 @@ def claim_due_enrollments(
             ):
                 continue
             token = secrets.token_hex(16)
+            if tracking.active_attempt_token:
+                # 未完成且已过期的 lease 视为中断重试；busy lease 已在锁内拒绝。
+                tracking.consecutive_failures += 1
             tracking.claim_generation += 1
             tracking.active_attempt_token = token
             tracking.claim_expires_at = now + timedelta(seconds=ttl_seconds)
@@ -1924,6 +1929,7 @@ def claim_due_enrollments(
                     "active_attempt_token",
                     "claim_expires_at",
                     "last_attempt_at",
+                    "consecutive_failures",
                     "updated_at",
                 )
             )
@@ -2733,7 +2739,8 @@ def _claim_multisource_due(
             Q(event__live_tracking__active_attempt_token="")
             | Q(event__live_tracking__claim_expires_at__lte=now)
         )
-        .order_by("event__live_tracking__next_poll_at", "event_id")
+        .annotate(_race_priority=due_priority(prefix="event__", now=now))
+        .order_by("_race_priority", "event__live_tracking__next_poll_at", "event_id")
         .values_list("event_id", flat=True)[:batch_size]
     )
     claims = []
@@ -2851,6 +2858,8 @@ def _claim_multisource_due(
                     proof_digest=binding.proof_digest,
                 )
                 token = secrets.token_hex(16)
+                if tracking.active_attempt_token:
+                    tracking.consecutive_failures += 1
                 tracking.claim_generation += 1
                 tracking.active_attempt_token = token
                 tracking.claim_expires_at = now + timedelta(seconds=ttl_seconds)
@@ -3045,9 +3054,11 @@ def finish_multisource_claim(
                     "jra_http_403",
                     "jra_http_406",
                 )
+                from .race_priority import needs_priority_result, retry_delay
                 checkpoint.next_poll_at = max(
                     retry_at or now,
-                    now + timedelta(hours=1) if denied else now + timedelta(minutes=5),
+                    now + retry_delay(priority=checkpoint.data_kind == "result"
+                                      and needs_priority_result(event), reason=reason_code, now=now),
                 )
                 first_allowed = multisource_initial_poll_at(
                     event=event, kind=checkpoint.data_kind, now=now
@@ -3058,7 +3069,7 @@ def finish_multisource_claim(
                 )
                 eligible = first_allowed is not None and first_allowed <= now and (
                     denied
-                    or reason_code in ("not_found", "not_published")
+                    or reason_code in ("not_found", "not_published", "result_incomplete")
                     or (
                         reason_code
                         in ("transport_failed", "timeout", "jra_transport_failed")
@@ -3117,6 +3128,7 @@ def finish_multisource_claim(
                         change = True
                         break
             checkpoint.save()
+        tracking.consecutive_failures = 0 if success else tracking.consecutive_failures + 1
         tracking.active_attempt_token = ""
         tracking.claim_expires_at = None
         tracking.lock_version += 1

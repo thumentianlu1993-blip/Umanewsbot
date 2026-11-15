@@ -114,16 +114,19 @@ def parse_card(raw):
         gaps=['non_runner_number_missing:'+r['external_runner_id'] for r in rows if not r['number']])
 
 
-def parse_result(raw,*,card):
+def parse_result(raw,*,card,allow_partial=False):
     race=_identity(raw);card_value=parse_card(card)
-    if card_value['card_stage']!='result':raise ValueError('uk_result_not_confirmed')
+    if card_value['card_stage']!='result' and not (allow_partial and card_value['card_stage']=='declared'):
+        raise ValueError('uk_result_not_confirmed')
     for key in ('external_race_id','local_date','course'):
         if race[key]!=card_value[key]:raise ValueError('uk_card_result_identity')
     card_rows={r['horse_id']:r for r in card['runners']}
     runners=_runners(raw)
     actual_ids={r['horse_id'] for r in runners}
     expected_ids={r['horse_id'] for r in card['runners'] if r['number'].upper()!='NR'}
-    if actual_ids!=expected_ids:raise ValueError('uk_card_result_roster')
+    complete = actual_ids == expected_ids
+    if not complete and (not allow_partial or not actual_ids <= expected_ids):
+        raise ValueError('uk_card_result_roster')
     nr_rows=[r for r in card_value['roster'] if r['status']=='non_runner']
     nr_text=text(raw,'non_runners')
     listed=[name_key(n.strip()) for n in nr_text.split(',') if n.strip()]
@@ -153,11 +156,13 @@ def parse_result(raw,*,card):
     if not counts:raise ValueError('uk_no_finisher')
     seen=0
     for position,count in sorted(counts.items()):
-        if position!=seen+1:raise ValueError('uk_finish_order')
+        if position!=seen+1:
+            if not allow_partial:raise ValueError('uk_finish_order')
+            complete = False
         seen+=count
     for row in rows:
         if counts.get(row['reported_finish_position'],0)>1:row['status']='dead_heat'
-    return dict(**race,roster=rows+nr_rows,roster_complete=True,result_phase='official',
+    return dict(**race,roster=rows+nr_rows,roster_complete=complete,result_phase='official' if complete else 'provisional',
         metadata={**card_value['metadata'],'winning_time_detail':text(raw,'winning_time_detail')},
         gaps=card_value['gaps'])
 

@@ -3249,12 +3249,20 @@ def _finished_race_queryset(queryset, now):
     return queryset.exclude(pk__in=hidden)
 
 
+def _with_winner_evidence(queryset):
+    from stable.models import RaceEventLifecycleTransition
+    return queryset.annotate(public_winner_observed=Exists(
+        RaceEventLifecycleTransition.objects.filter(event_id=OuterRef("pk"),
+            record_kind="applied", to_status="finished", reason_code="data_sync_winner_observed")
+    ))
+
+
 def _public_race_status_label(event: RaceEvent, today, winner=None, *, now=None) -> str:
     event.public_time_label = _race_time_label(event)
     if event.country_region == "united_states" and (event.source_refs or {}).get("us_not_run"):
         return "本年度未举办"
     if event.status == RaceEventStatus.FINISHED:
-        return "已完赛" if winner else "赛果待确认"
+        return "已完赛" if winner or getattr(event, "public_winner_observed", False) else "赛果待确认"
     now = now or timezone.now()
     stamp = public_time(event)
     today = now.astimezone(BEIJING).date()
@@ -3289,7 +3297,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
     """首页近期赛事：北京今天及后六天，最多四场，不回填远期。"""
     now = timezone.now()
     today = now.astimezone(BEIJING).date()
-    base = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
+    base = annotate_public_time(_with_winner_evidence(RaceEvent.objects.filter(public_race_q()))).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__isnull=False,
     ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
@@ -3341,7 +3349,7 @@ def _public_today_races() -> tuple[list[dict], bool]:
 def _public_next_key_race():
     """右栏"即将开赛"模块：最近一场公开重点赛事。"""
     today = timezone.localdate(timezone=BEIJING)
-    queryset = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
+    queryset = annotate_public_time(_with_winner_evidence(RaceEvent.objects.filter(public_race_q()))).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__isnull=False,
         public_date__gte=today,
@@ -3361,7 +3369,7 @@ def _public_race_calendar_base_queryset(filters: dict, *, today):
     read-gate 展示 annotation 只在最终赛事对象查询上加。"""
     from .services.race_information_display import filter_public_grade
 
-    queryset = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
+    queryset = annotate_public_time(_with_winner_evidence(RaceEvent.objects.filter(public_race_q()))).filter(
         visibility_status=RaceEventVisibility.PUBLISHED
     ).exclude(canonical_product_links__is_active=True).filter(divisions__isnull=True)
     selected_year = (
@@ -3633,7 +3641,7 @@ def _public_weekly_focus_events(region: str = "", *, events: list[RaceEvent] | N
             and event_grade_field(event).code in PUBLIC_RACE_GRADE_FILTERS["g1"]
             and (not region or event.country_region == region)
         ][:3]
-    queryset = annotate_public_time(RaceEvent.objects.filter(public_race_q())).filter(
+    queryset = annotate_public_time(_with_winner_evidence(RaceEvent.objects.filter(public_race_q()))).filter(
         visibility_status=RaceEventVisibility.PUBLISHED,
         public_date__gte=week_start,
         public_date__lte=week_end,
@@ -4048,7 +4056,7 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
         # event 已有 registry 路径，所有入口都必须由 registry 明确占用。
         event_queryset = event_queryset.filter(public_paths__isnull=True)
     event = get_object_or_404(
-        event_queryset,
+        _with_winner_evidence(event_queryset),
         **event_lookup,
     )
     live_result_status = None

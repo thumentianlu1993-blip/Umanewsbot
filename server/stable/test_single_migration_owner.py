@@ -66,6 +66,8 @@ SERVICE_IDS = {
     "beat": "cidbeat3333cccc",
     "race_live_worker": "cidrlive4444dddd",
     "race_sync_v2_worker": "cidrsync7777gggg",
+    "race_control_worker": "cidcontrol8888",
+    "race_realtime_worker": "cidrealtime9999",
     "db": "ciddb5555555eeee",
     "redis": "cidredis6666ffff",
 }
@@ -2160,7 +2162,7 @@ class DeployOrchestrationTests(SimpleTestCase):
         )
         drain = index(is_drain_exec, "celery drain")
         stop_worker = index(
-            lambda e: e[0] == "compose" and e[2] == ["stop", "worker"], "stop worker"
+            lambda e: e[0] == "compose" and e[2] == ["stop", "worker", "race_control_worker", "race_realtime_worker"], "stop worker"
         )
         stop_race_live = index(
             lambda e: e[0] == "compose" and e[2] == ["stop", "race_live_worker"],
@@ -2182,7 +2184,7 @@ class DeployOrchestrationTests(SimpleTestCase):
         healthy_probe += up_web + 1
         up_downstream = index(
             lambda e: e[0] == "compose"
-            and e[2] == ["up", "-d", "--no-deps", "worker", "beat", "nginx"],
+            and e[2] == ["up", "-d", "--no-deps", "worker", "race_control_worker", "race_realtime_worker"],
             "up worker beat nginx",
         )
         up_race_live = index(
@@ -3764,7 +3766,7 @@ class RaceDataSyncWorkerReleaseStateTests(SimpleTestCase):
         self.assertLess(events.index('drain'),events.index('stop-with-verified-intent:race_sync_v2_worker'))
         self.assertLess(events.index('stop-with-verified-intent:race_sync_v2_worker'),events.index('stop-with-verified-intent:web'))
         self.assertEqual(events.count('start-after-completion:race_sync_v2_worker'),1)
-        self.assertIn('drain-nodes:node-worker node-race_sync_v2_worker',events)
+        self.assertIn('drain-nodes:node-worker node-race_sync_v2_worker node-race_control_worker node-race_realtime_worker',events)
         self.assertFalse((h.directory.parent/'active.json').exists())
 
 
@@ -4168,7 +4170,7 @@ class ResumeStoppedReleaseTests(SimpleTestCase):
             up_downstream = first_index(
                 evts,
                 lambda e: e[0] == "compose"
-                and e[2] == ["up", "-d", "--no-deps", "worker", "beat", "nginx"],
+                and e[2] == ["up", "-d", "--no-deps", "worker", "race_control_worker", "race_realtime_worker"],
             )
             self.assertIsNotNone(up_downstream)
             final_ps = first_index(

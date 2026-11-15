@@ -54,7 +54,7 @@ services:
       - db
       - redis
 
-  race_sync_v2_worker:
+  race_sync_v2_worker: &race_sync_worker
     build: .
     command: /app/deploy/docker/start-race-data-sync-worker.sh
     volumes:
@@ -68,6 +68,21 @@ services:
     depends_on:
       - db
       - redis
+
+
+  race_control_worker:
+    <<: *race_sync_worker
+    command: /app/deploy/docker/start-race-priority-worker.sh control
+    cpus: ${RACE_CONTROL_WORKER_CPUS:-0.25}
+    cpu_shares: 2048
+    mem_limit: ${RACE_CONTROL_WORKER_MEMORY_LIMIT:-384M}
+
+  race_realtime_worker:
+    <<: *race_sync_worker
+    command: /app/deploy/docker/start-race-priority-worker.sh realtime
+    cpus: ${RACE_REALTIME_WORKER_CPUS:-0.5}
+    cpu_shares: 2048
+    mem_limit: ${RACE_REALTIME_WORKER_MEMORY_LIMIT:-384M}
 
   beat:
     build: .

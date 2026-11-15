@@ -928,17 +928,19 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = int(env("CELERY_WORKER_PREFETCH_MULTIPLIER",
 CELERY_TASK_ACKS_LATE = env_bool("CELERY_TASK_ACKS_LATE", True)
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_ROUTES = {
+    "stable.tasks.select_due_race_data_sync_task": {"queue": "race_control"},
+    "stable.tasks.scan_due_race_event_lifecycle_task": {"queue": "race_control"},
     "stable.tasks.poll_race_live_event_task": {"queue": "race_live"},
     "stable.tasks.monitor_race_live_sla_task": {"queue": "race_live"},
     "stable.tasks.sync_race_event_provider_task": {"queue": "race_sync_v2"},
     "stable.tasks.discover_future_race_data_sync_task": {"queue": "race_sync_v2"},
     "stable.tasks.discover_uk_pre_race_task": {"queue": "race_sync_v2"},
     "stable.tasks.discover_us_pre_race_task": {"queue": "race_sync_v2"},
-    "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "celery"},
-    "stable.tasks.monitor_race_data_sync_result_slo_task": {"queue": "celery"},
+    "stable.tasks.advance_race_data_sync_lifecycle_task": {"queue": "race_control"},
+    "stable.tasks.monitor_race_data_sync_result_slo_task": {"queue": "race_control"},
     "stable.tasks.monitor_public_race_coverage_task": {"queue": "race_sync_v2"},
     "stable.tasks.cleanup_race_data_sync_artifacts_task": {"queue": "race_sync_v2"},
-    "stable.tasks.advance_race_event_lifecycle_task": {"queue": "celery"},
+    "stable.tasks.advance_race_event_lifecycle_task": {"queue": "race_control"},
     "stable.tasks.scheduled_race_result_review_task": {"queue": "celery"},
     "stable.tasks.reconcile_stale_race_result_review_claims_task": {
         "queue": "celery"
@@ -1014,7 +1016,7 @@ def build_race_data_sync_beat_schedule(
         schedule["select-due-race-data-sync"] = {
             "task": "stable.tasks.select_due_race_data_sync_task",
             "schedule": crontab(minute="*"),
-            "options": {"queue": "celery", "expires": 55},
+            "options": {"queue": "race_control", "expires": 55},
         }
     if future_discovery_enabled:
         schedule["discover-future-race-data-sync"] = {
@@ -1026,13 +1028,13 @@ def build_race_data_sync_beat_schedule(
         schedule["advance-race-data-sync-lifecycle"] = {
             "task": "stable.tasks.advance_race_data_sync_lifecycle_task",
             "schedule": crontab(minute="*"),
-            "options": {"queue": "celery", "expires": 55},
+            "options": {"queue": "race_control", "expires": 55},
         }
     if scheduler_enabled:
         schedule["monitor-race-data-sync-result-slo"] = {
             "task": "stable.tasks.monitor_race_data_sync_result_slo_task",
             "schedule": crontab(minute="*"),
-            "options": {"queue": "celery", "expires": 55},
+            "options": {"queue": "race_control", "expires": 55},
         }
         schedule["cleanup-race-data-sync-artifacts"] = {
             "task": "stable.tasks.cleanup_race_data_sync_artifacts_task",
@@ -1071,16 +1073,6 @@ CELERY_BEAT_SCHEDULE = {
     "crawl-netkeiba-latest-hourly": {
         "task": "stable.tasks.crawl_netkeiba_latest",
         "schedule": crontab(minute=0),
-    },
-    "crawl-netkeiba-latest-sunday-rush": {
-        "task": "stable.tasks.crawl_netkeiba_latest",
-        "schedule": crontab(minute="30,35,40,45,50,55", hour=14, day_of_week="sun"),
-        "kwargs": {"max_pages": 5, "rush_window": True},
-    },
-    "crawl-netkeiba-latest-sunday-rush-end": {
-        "task": "stable.tasks.crawl_netkeiba_latest",
-        "schedule": crontab(minute="0,5,10,15,20,25,30", hour=15, day_of_week="sun"),
-        "kwargs": {"max_pages": 5, "rush_window": True},
     },
     "crawl-netkeiba-access": {
         "task": "stable.tasks.crawl_netkeiba_access",
@@ -1124,7 +1116,8 @@ CELERY_BEAT_SCHEDULE = {
     },
     "scan-due-race-lifecycle": {
         "task": "stable.tasks.scan_due_race_event_lifecycle_task",
-        "schedule": crontab(minute="*/5"),
+        "schedule": crontab(minute="*"),
+        "options": {"queue": "race_control", "expires": 55},
     },
     "production-summary-daily": {
         "task": "stable.tasks.production_summary_task",

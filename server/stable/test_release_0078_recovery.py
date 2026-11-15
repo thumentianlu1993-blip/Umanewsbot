@@ -211,7 +211,7 @@ class Release0078ArtifactTests(TestCase):
             "candidate_commit": "b" * 40, "candidate_image_id": "sha256:" + "c" * 64,
             "database_identity_sha256": "d" * 64, "compose_file": "docker-compose.prod.yml",
         }
-        self.services = {name: name in {"web", "worker", "beat", "nginx"} for name in ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")}
+        self.services = {name: name in {"web", "worker", "beat", "nginx"} for name in ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "nginx")}
         self.manifest = {
             "schema_version": "release-0078-verified-backup-recovery/v1", **self.bindings,
             "source_leaf": LEAF_0078, "target_leaf": LEAF_0078, "operation": "same-schema",

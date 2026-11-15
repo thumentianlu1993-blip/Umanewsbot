@@ -238,9 +238,9 @@ class RaceDataSyncChainE2ETests(TestCase):
         stats = race_data_sync_lifecycle.advance_due_data_sync_lifecycle(
             now=self.race_datetime + timedelta(minutes=31)
         )
-        self.assertEqual(stats["transitioned"], 1, stats)
+        self.assertEqual(stats["transitioned"], 0, stats)
         self.event.refresh_from_db()
-        self.assertEqual(self.event.status, models.RaceEventStatus.FINISHED)
+        self.assertEqual(self.event.status, models.RaceEventStatus.RUNNING)
 
         # 出马表写入在单元套件中单独覆盖；此处直接给出出马状态。
         source = models.RaceResultSourceIdentity.objects.get(event=self.event)

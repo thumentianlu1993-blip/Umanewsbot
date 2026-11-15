@@ -194,7 +194,7 @@ class Release0078PostgresTests(TestCase):
             bindings = {"release_id": release_id, "origin_handoff_sha256": release_id,
                         "candidate_commit": candidate, "candidate_image_id": image,
                         "database_identity_sha256": db_identity, "compose_file": "docker-compose.prod.yml"}
-            restore = {name: False for name in ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")}
+            restore = {name: False for name in ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "nginx")}
             manifest = {"schema_version": "release-0078-verified-backup-recovery/v1", **bindings,
                         "source_leaf": "stable.0077_racing_api_horse_identity_staging",
                         "target_leaf": "stable.0078_externalhorse_profile_snapshot", "operation": "upgrade",

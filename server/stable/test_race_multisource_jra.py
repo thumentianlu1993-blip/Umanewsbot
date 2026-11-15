@@ -97,6 +97,34 @@ class JraColdStartTests(TestCase):
             enabled_data_kinds=("result",),
         )[0]
 
+    def _assert_selector_priority(self, *, failures, expected_queue, expected_priority, expired=False):
+        from stable.tasks import select_due_race_data_sync_task
+        self.enroll()
+        if expired:
+            self.claim()
+        tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
+        if expired:
+            tracking.claim_expires_at = NOW - timedelta(seconds=1)
+            tracking.save(update_fields=("claim_expires_at",))
+        tracking.consecutive_failures = failures
+        tracking.save(update_fields=("consecutive_failures",))
+        with patch("stable.tasks.sync_race_event_provider_task.apply_async") as dispatch, \
+                self.captureOnCommitCallbacks(execute=True):
+            result = select_due_race_data_sync_task()
+        self.assertEqual(result["dispatched"], 1)
+        self.assertEqual(dispatch.call_args.kwargs["queue"], expected_queue)
+        self.assertEqual(dispatch.call_args.kwargs["priority"], expected_priority)
+
+    def test_selector_sends_new_result_with_lower_message_priority(self):
+        self._assert_selector_priority(failures=0, expected_queue="race_realtime", expected_priority=3)
+
+    def test_selector_sends_retry_with_high_message_priority(self):
+        self._assert_selector_priority(failures=1, expected_queue="race_realtime_retry", expected_priority=0)
+
+    def test_expired_worker_claim_is_reissued_at_retry_priority(self):
+        self._assert_selector_priority(failures=0, expired=True,
+                                      expected_queue="race_realtime_retry", expected_priority=0)
+
     def test_cold_start_result_only_full_chain(self):
         self.enroll()
         self.assertEqual(models.RaceEventIdentityKey.objects.count(), 1)
@@ -239,6 +267,23 @@ class JraColdStartTests(TestCase):
         result = run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)
         self.assertFalse(result["processed"], result)
         self.assertEqual(self.event.runners.count(), 0)
+        self.assertEqual(self.event.results.count(), 0)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, "finished")
+        self.assertIsNone(self.event.result_confirmed_at)
+        self.assertLessEqual(self.event.live_tracking.next_poll_at, NOW + timedelta(minutes=1))
+
+    def test_winner_with_pending_other_positions_advances_state_only(self):
+        from bs4 import BeautifulSoup
+        self.enroll()
+        soup = BeautifulSoup(self.result, "html.parser")
+        soup.select("tbody > tr")[-1].select_one("td.place").string = ""
+        self.result = str(soup)
+        result = run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)
+        self.assertFalse(result["processed"])
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, "finished")
+        self.assertIsNone(self.event.result_confirmed_at)
         self.assertEqual(self.event.results.count(), 0)
 
     def test_explicit_source_block_hides_published_result(self):

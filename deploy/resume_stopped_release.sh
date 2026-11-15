@@ -59,7 +59,7 @@ fi
 # Fail closed if any application service is running, restarting, or its state
 # cannot be read (same standard as manual_release.sh). No service may be
 # started before this gate.
-for service in web worker beat race_live_worker race_sync_v2_worker; do
+for service in web worker beat race_live_worker race_sync_v2_worker race_control_worker race_realtime_worker; do
   if ! ps_output="$("$COMPOSE" -f "$COMPOSE_FILE" ps -q "$service" 2>/dev/null)"; then
     echo "resume: cannot list $service containers; failing closed" >&2
     exit 1
@@ -158,7 +158,8 @@ echo "resume: waiting for web to become healthy"
 COMPOSE_FILE="$COMPOSE_FILE" SERVICE_NAME=web ./deploy/wait_for_compose_service_healthy.sh
 
 echo "resume: starting worker, beat and nginx"
-"$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps worker beat nginx
+"$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps worker race_control_worker race_realtime_worker
+"$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps beat nginx
 
 if [ "$race_live_intent" = "running" ]; then
   echo "resume: restoring race_live_worker from the frozen running intent"

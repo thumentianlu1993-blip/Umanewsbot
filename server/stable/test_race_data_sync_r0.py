@@ -350,7 +350,7 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
         )
         self.assertEqual(
             schedule["select-due-race-data-sync"]["options"]["queue"],
-            "celery",
+            "race_control",
         )
         self.assertEqual(
             schedule["discover-future-race-data-sync"]["options"]["queue"],
@@ -358,11 +358,11 @@ class RaceDataSyncR0FlagContractTests(SimpleTestCase):
         )
         self.assertEqual(
             schedule["advance-race-data-sync-lifecycle"]["options"]["queue"],
-            "celery",
+            "race_control",
         )
         self.assertEqual(
             schedule["monitor-race-data-sync-result-slo"]["options"]["queue"],
-            "celery",
+            "race_control",
         )
         self.assertEqual(
             schedule["cleanup-race-data-sync-artifacts"]["options"]["queue"],
@@ -867,6 +867,7 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         self.assertEqual(decision.reason_code, "claim_cas_stale")
         tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
         self.assertEqual(tracking.active_attempt_token, second.attempt_token)
+        self.assertEqual(tracking.consecutive_failures, 1)
 
     def test_expired_provider_task_cannot_complete_or_release_claim(self):
         self._acquire()
@@ -2536,7 +2537,7 @@ class RaceDataSyncWorkerReleaseContractTests(SimpleTestCase):
             self.assertIn("RACE_DATA_SYNC_WORKER_CPUS", compose, compose_name)
             self.assertIn("RACE_DATA_SYNC_WORKER_MEMORY_LIMIT", compose, compose_name)
             service = re.search(
-                r"(?ms)^  race_sync_v2_worker:\n(.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
+                r"(?ms)^  race_sync_v2_worker:(?: &[^\n]+)?\n(.*?)(?=^  [a-zA-Z0-9_-]+:\n|\Z)",
                 compose,
             )
             self.assertIsNotNone(service, compose_name)

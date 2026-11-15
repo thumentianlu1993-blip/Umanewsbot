@@ -2372,8 +2372,6 @@ class AdapterTests(TestCase):
 
     def test_netkeiba_rank_schedule_and_builtin_interval_stay_aligned(self):
         latest_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-latest-hourly"]["schedule"]
-        rush_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-latest-sunday-rush"]["schedule"]
-        rush_end_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-latest-sunday-rush-end"]["schedule"]
         access_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-access"]["schedule"]
         attention_schedule = django_settings.CELERY_BEAT_SCHEDULE["crawl-netkeiba-attention"]["schedule"]
 
@@ -2383,7 +2381,6 @@ class AdapterTests(TestCase):
         latest_minutes = minute_values(latest_schedule)
         access_minutes = minute_values(access_schedule)
         attention_minutes = minute_values(attention_schedule)
-        rush_minutes = minute_values(rush_schedule) | minute_values(rush_end_schedule)
 
         self.assertEqual(access_schedule._orig_minute, 16)
         self.assertEqual(attention_schedule._orig_minute, 26)
@@ -2392,8 +2389,6 @@ class AdapterTests(TestCase):
         self.assertTrue(latest_minutes.isdisjoint(access_minutes))
         self.assertTrue(latest_minutes.isdisjoint(attention_minutes))
         self.assertTrue(access_minutes.isdisjoint(attention_minutes))
-        self.assertTrue(rush_minutes.isdisjoint(access_minutes))
-        self.assertTrue(rush_minutes.isdisjoint(attention_minutes))
         definitions = {(item["source_site"], item["source_mode"]): item for item in BUILTIN_SOURCE_DEFINITIONS}
         self.assertEqual(definitions[(SourceSite.NETKEIBA, SourceMode.ACCESS)]["crawl_interval_minutes"], 60)
         self.assertEqual(definitions[(SourceSite.NETKEIBA, SourceMode.ATTENTION)]["crawl_interval_minutes"], 60)
@@ -16460,7 +16455,7 @@ class RaceEventPageMVPTests(TestCase):
         self.client.force_login(self.user)
         for index in range(50):
             RaceEvent.objects.create(
-                year=2026,
+                year=(timezone.localdate() + timedelta(days=index + 1)).year,
                 slug=f"filtered-race-{index}",
                 original_name=f"Filtered Race {index}",
                 chinese_name=f"筛选赛事 {index}",

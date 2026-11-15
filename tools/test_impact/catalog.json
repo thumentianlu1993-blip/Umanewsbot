@@ -1035,6 +1035,39 @@
     ],
     "module:stable.test_hkjc_name_catalog": [
       "stable.test_hkjc_name_catalog"
+    ],
+    "race_priority_lifecycle": [
+      "stable.test_race_priority_lifecycle",
+      "stable.test_race_event_lifecycle",
+      "stable.test_race_data_sync_lifecycle",
+      "stable.test_race_data_sync_lifecycle_advance",
+      "stable.test_race_data_sync_lifecycle_wiring",
+      "stable.test_race_data_sync_r0",
+      "stable.test_race_data_sync_r0_postgres",
+      "stable.test_race_data_sync_providers",
+      "stable.test_race_data_sync_results",
+      "stable.test_race_data_sync_result_admission",
+      "stable.test_race_data_sync_admission",
+      "stable.test_race_data_sync_alerts",
+      "stable.test_race_data_sync_chain_e2e",
+      "stable.test_race_multisource_jra",
+      "stable.test_race_multisource_identity",
+      "stable.test_race_multisource_regions",
+      "stable.test_race_multisource_postgres",
+      "stable.test_race_data_sync_repair",
+      "stable.test_race_public_time",
+      "stable.test_race_information_display_pages",
+      "stable.test_race_coverage_queue",
+      "stable.test_release_0078_entrypoints",
+      "stable.test_release_0078_recovery",
+      "stable.test_release_0078_recovery_postgres",
+      "stable.test_release_0079",
+      "stable.test_single_migration_owner",
+      "stable.tests_legacy.AdapterTests",
+      "stable.tests_legacy.PublicHomeInfoFeedTests"
+    ],
+    "module:stable.test_race_priority_lifecycle": [
+      "stable.test_race_priority_lifecycle"
     ]
   },
   "dependencies": {
@@ -3338,6 +3371,12 @@
       "domains": [
         "module:stable.test_hkjc_name_catalog"
       ]
+    },
+    "server/stable/test_race_priority_lifecycle.py": {
+      "label": "stable.test_race_priority_lifecycle",
+      "domains": [
+        "race_priority_lifecycle"
+      ]
     }
   },
   "profiles": {
@@ -3707,7 +3746,8 @@
     "stable.test_p01_news_source_evidence": "django",
     "stable.test_p01_news_workflow": "django",
     "stable.test_p01_main_integration": "django",
-    "stable.test_hkjc_name_catalog": "django"
+    "stable.test_hkjc_name_catalog": "django",
+    "stable.test_race_priority_lifecycle": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3797,7 +3837,8 @@
     "us_source_collection": "integration: 美国只读来源、阶段语义、缓存回放与来源入口",
     "uk_race_automation": "integration: 英国付费采集、赛前阶段、完整赛果及发布恢复",
     "five_region_race_governance": "application/integration: 五地区公开过滤、历史字段修复与来源边界",
-    "news_quality": "application/integration: P01 全文审校、精确稿件、预算、审核队列与五地区观测"
+    "news_quality": "application/integration: P01 全文审校、精确稿件、预算、审核队列与五地区观测",
+    "race_priority_lifecycle": "application/integration/operations: 赛事控制与取数资源隔离、冠军驱动完赛、预算及发布恢复"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",

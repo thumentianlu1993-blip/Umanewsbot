@@ -7,7 +7,10 @@ def source_observation(payload,*,route,now):
     from .race_data_source_adapters import canonical_sha,aware,require_sha
     if payload.get('stage') in {'not_published','nominations','weights_published'}:
         raise ValueError('uk_awaiting_final_card')
-    if payload.get('gaps') or not payload.get('roster_complete'):raise ValueError('uk_roster_incomplete')
+    complete = bool(payload.get('roster_complete') and not payload.get('gaps'))
+    if not complete and not (payload.get('result_phase') and any(
+            r.get('reported_finish_position') == 1 for r in payload.get('roster',[]))):
+        raise ValueError('uk_roster_incomplete')
     docs=payload['source_documents'];external=payload['external_race_id']
     result=bool(payload.get('result_phase'));primary=payload.get('primary_source_url') or api_url('result' if result else 'card',race_id=external)
     sources={doc['url']:doc for doc in docs}
@@ -31,7 +34,7 @@ def source_observation(payload,*,route,now):
         raw_sha256=canonical_sha({url:doc['sha256'] for url,doc in sources.items()}),parser_version=route.parser_version,
         venue_key=_venue(payload['course'],route),local_date=payload['local_date'],timezone=route.timezone,
         meeting_session='',race_number='',raw_names=[payload['race_name']],off_time=payload['off_time'],
-        roster=rows,result_phase=payload.get('result_phase',''),roster_complete=True,roster_evidence=evidence,
+        roster=rows,result_phase=payload.get('result_phase','') if complete else 'provisional',roster_complete=complete,roster_evidence=evidence,
         uk_race_metadata={**payload.get('metadata',{}),'external_race_id':external,'local_date':payload['local_date'],
             'source_url':primary,'source_sha256':sources[primary]['sha256'],'observed_at':sources[primary]['fetched_at']})
 

@@ -82,7 +82,62 @@ def _canonical_sha256(value: Any) -> str:
     ).hexdigest()
 
 
-def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
+def _result_facts(value):
+    """传输审计元数据不属于赛果内容；旧 revision 也用同一规则比较。"""
+    if isinstance(value, dict):
+        return {key: _result_facts(item) for key, item in value.items() if key not in {
+            "raw_sha256", "observed_at", "fetched_at", "source_updated_at", "odds_observed_at",
+            "source_url", "multisource_source_set_digest", "france_basic_sha256",
+        }}
+    if isinstance(value, (list, tuple)):
+        return [_result_facts(item) for item in value]
+    return value
+
+
+def _only_missing_time_added(previous, candidate):
+    old, new = _result_facts(previous), _result_facts(candidate)
+    old_rows, new_rows = old.get("participants", []), new.get("participants", [])
+    if len(old_rows) != len(new_rows):
+        return False
+    filled = False
+    for before, after in zip(old_rows, new_rows):
+        if not before.get("finish_time") and after.get("finish_time"):
+            filled = True
+            if "finish_time" in before:
+                after["finish_time"] = before["finish_time"]
+            else:
+                after.pop("finish_time")
+    return filled and old == new
+
+
+def _advance_from_winner(*, event, lifecycle, observation, source_class, rows, now):
+    """调用方已持有 claim/赛事锁并验证来源和生命周期权限，仅推进状态。"""
+    if event.status not in (models.RaceEventStatus.SCHEDULED, models.RaceEventStatus.RUNNING):
+        return False
+    if any((event.manual_lock_flags or {}).get(key) for key in ("status", "result", "results")):
+        return False
+    if not any(row["reported_finish_position"] == 1 and row["status"] in _RANKED_RESULT_STATUSES for row in rows):
+        return False
+    source = observation.source_identity
+    before = event.status
+    event.status = models.RaceEventStatus.FINISHED
+    event.save(update_fields=("status", "updated_at"))
+    models.RaceEventLifecycleTransition.objects.get_or_create(
+        dedupe_key=f"data-sync-winner:{event.pk}:{observation.pk}",
+        defaults=dict(event=event, from_status=before, to_status=event.status,
+            reason_code="data_sync_winner_observed", effective_at=now,
+            source_authority=source_class, source_key=source.source_key,
+            source_url=source.canonical_url, trigger_task="sync_race_event_provider_task",
+            schedule_generation=lifecycle.schedule_generation if lifecycle else 0,
+            record_kind=models.RaceEventLifecycleTransitionKind.APPLIED,
+            metadata={"observation_id": observation.pk, "complete_result_confirmed": False}),
+    )
+    # 保留原 claim 和取数检查点，完赛后继续补齐完整正式赛果。
+    invalidate_public_race_cache()
+    return True
+
+
+def _normalize_result_rows(payload: object, *, complete_order=True) -> tuple[dict[str, Any], ...]:
     if not isinstance(payload, dict) or set(payload) - {'france_basic_sha256'} != {
         "external_race_id",
         "off_time",
@@ -161,7 +216,7 @@ def _normalize_result_rows(payload: object) -> tuple[dict[str, Any], ...]:
         counts[position] = counts.get(position, 0) + 1
     ranked_count = 0
     for position, count in sorted(counts.items()):
-        if position != ranked_count + 1:
+        if complete_order and position != ranked_count + 1:
             raise ValueError("result finish order is not a legal competition ranking")
         ranked_count += count
     for row in normalized:
@@ -497,7 +552,7 @@ def apply_data_sync_result_observation(
         ):
             return DataSyncResultApplyDecision("rejected", "source_contract_mismatch")
         try:
-            rows = _normalize_result_rows(observation.normalized_payload)
+            rows = _normalize_result_rows(observation.normalized_payload, complete_order=False)
         except (TypeError, ValueError):
             return DataSyncResultApplyDecision("rejected", "result_payload_incomplete")
         ordered_rows = tuple(
@@ -552,6 +607,23 @@ def apply_data_sync_result_observation(
         elif data_sync_admission is not None:
             lifecycle_trusted = data_sync_admission.admitted
             lifecycle_reason = data_sync_admission.reason_code
+        if event.status in (models.RaceEventStatus.CANCELLED, models.RaceEventStatus.POSTPONED):
+            return DataSyncResultApplyDecision("rejected", "event_not_running")
+        if (observation.normalized_payload["external_race_id"] != source.external_race_id
+                or observation.normalized_payload["region"] != source.region_code):
+            return DataSyncResultApplyDecision("rejected", "event_identity_mismatch")
+        granted_identity_id = models.RaceDataSyncEnrollment.objects.filter(
+            event_id=expected_event_id,
+            state=models.RaceDataSyncEnrollmentState.ENROLLED,
+        ).values_list("source_identity_id", flat=True).first()
+        winner_source_granted = is_multisource or granted_identity_id in (None, source.pk)
+        if project_current and lifecycle_trusted and winner_source_granted:
+            _advance_from_winner(event=event, lifecycle=lifecycle, observation=observation,
+                source_class=candidate_source_class, rows=rows, now=now)
+        try:
+            _normalize_result_rows(observation.normalized_payload)
+        except (TypeError, ValueError):
+            return DataSyncResultApplyDecision("rejected", "result_payload_incomplete")
         race_status = str(
             observation.normalized_payload.get("race_status") or ""
         ).strip().casefold()
@@ -785,7 +857,13 @@ def apply_data_sync_result_observation(
                 return DataSyncResultApplyDecision(
                     "replayed", "same_event_result_evidence", current.pk, True
                 )
+        # content_sha256 继续绑定完整原始 observation，公开读合同保持兼容。
+        # 仅在决定是否发生更正时排除传输元数据。
         content_sha256 = _canonical_sha256(observation.normalized_payload)
+        same_source_facts = bool(current_observation is not None
+            and current_observation.source_identity_id == source.pk
+            and _result_facts(current_observation.normalized_payload)
+                == _result_facts(observation.normalized_payload))
         arbitration = arbitrate_source_value(
             current_source_key=current_source_key,
             current_source_class=current_source_class,
@@ -794,14 +872,16 @@ def apply_data_sync_result_observation(
             candidate_source_class=candidate_source_class,
             candidate_observed_at=candidate_watermark,
             has_current_value=current is not None,
-            values_equal=current_hash == content_sha256,
+            values_equal=current_hash == content_sha256 or same_source_facts,
             manual_locked=bool(
                 manual_locks.get("results")
                 or manual_locks.get("result")
                 or manual_locks.get("status")
             ),
         )
-        if current is not None and current_hash == content_sha256:
+        if current is not None and (current_hash == content_sha256 or same_source_facts):
+            models.RaceEventRevisionEvidence.objects.get_or_create(
+                revision=current, observation=observation, defaults={"role": "supporting"})
             return DataSyncResultApplyDecision(
                 "replayed", arbitration.reason_code, current.pk, True
             )
@@ -815,11 +895,15 @@ def apply_data_sync_result_observation(
             and arbitration.reason_code == "higher_priority_source"
             and not is_multisource
         )
-        authorized_replacement = correction_marked or priority_replacement
+        time_enrichment = bool(current_observation is not None
+            and current_observation.source_identity_id == source.pk
+            and _only_missing_time_added(current_observation.normalized_payload,
+                                         observation.normalized_payload))
+        authorized_replacement = correction_marked or priority_replacement or time_enrichment
         if (
             current is not None
             and authorized_replacement
-            and not correction_apply_enabled
+            and not correction_apply_enabled and not time_enrichment
             and arbitration.apply
         ):
             return DataSyncResultApplyDecision(
@@ -834,10 +918,6 @@ def apply_data_sync_result_observation(
         correction_conflict = bool(
             current is not None and not authorized_replacement
         )
-        granted_identity_id = models.RaceDataSyncEnrollment.objects.filter(
-            event_id=expected_event_id,
-            state=models.RaceDataSyncEnrollmentState.ENROLLED,
-        ).values_list("source_identity_id", flat=True).first()
         initial_from_ungranted_source = bool(
             project_current
             and current is None
@@ -858,6 +938,15 @@ def apply_data_sync_result_observation(
             kind=models.RaceEventRevisionKind.RESULT,
             content_sha256=content_sha256,
         ).first()
+        if existing is None and correction_conflict:
+            pending = models.RaceEventRevision.objects.filter(
+                event=event, kind=models.RaceEventRevisionKind.RESULT,
+                conflict_status=models.RaceEventRevisionConflictStatus.PENDING,
+                primary_observation__source_identity=source,
+            ).select_related("primary_observation").order_by("-id").first()
+            if (pending is not None and _result_facts(pending.primary_observation.normalized_payload)
+                    == _result_facts(observation.normalized_payload)):
+                existing = pending
         promote_existing = bool(
             existing is not None
             and may_project

@@ -373,6 +373,7 @@ def parse_jra_observation(page, *, url, route, now):
         ).isoformat()
     table = header.find_parent("table")
     rows = []
+    complete_rows = True
     is_result = bool(static) or urlsplit(url).path.endswith("accessS.html")
     if not table or not table.select("tbody > tr"):
         raise ValueError("jra_roster_missing")
@@ -385,7 +386,10 @@ def parse_jra_observation(page, *, url, route, now):
         name = field("td.horse .name") or field("td.horse")
         number = field("td.num")
         if not name or not number.isdigit():
-            raise ValueError("jra_roster_partial")
+            if not is_result:
+                raise ValueError("jra_roster_partial")
+            complete_rows = False
+            continue
         place = field("td.place")
         status = "declared"
         position = None
@@ -400,8 +404,7 @@ def parse_jra_observation(page, *, url, route, now):
                     "中止": "did_not_finish",
                     "失格": "disqualified",
                 }.get(place, "unknown")
-                if status == "unknown":
-                    raise ValueError("jra_result_status_unknown")
+
         rows.append(
             dict(
                 external_runner_id="number:" + number,
@@ -442,8 +445,8 @@ def parse_jra_observation(page, *, url, route, now):
             raise ValueError("jra_result_incomplete")
     value.update(
         roster=rows,
-        result_phase="official" if is_result else "",
-        roster_complete=True,
+        result_phase=("official" if complete_rows and all(r["status"] != "unknown" for r in rows) else "provisional") if is_result else "",
+        roster_complete=complete_rows and all(r["status"] != "unknown" for r in rows),
     )
     from .race_pre_race import normalize_jra_race_name
     normalized_name = normalize_jra_race_name(value['raw_names'][0])
@@ -748,7 +751,8 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
             from .uk_race_source import validate_final_roster
             verified_uk = validate_final_roster(value)
         value["roster_complete"] = bool(
-            ((verified_incidents or verified_us or verified_uk) and not expected) or expected
+            value.get("roster_complete") and
+            (((verified_incidents or verified_us or verified_uk) and not expected) or expected
             and (
                 sorted(expected) == sorted(actual)
                 or (
@@ -758,7 +762,7 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
                     and event.runners.exists()
                     and sorted(n for n, _ in expected) == sorted(n for n, _ in actual)
                 )
-            )
+            ))
         )
     if previous and not source:
         value["identity_seed_receipt"] = seed_receipt(
@@ -953,13 +957,15 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
     binding, route = claim_binding(claim, now=now)
     identity_reason = ""
     try:
-        value = fetch_bound_observation(
-            event=locked.event,
-            route=route,
-            now=now,
-            fetcher=fetcher,
-            kind="result" if "result" in claim.data_kinds else "racecard",
-        )
+        from .race_priority import result_transport_scope
+        with result_transport_scope(claim):
+            value = fetch_bound_observation(
+                event=locked.event,
+                route=route,
+                now=now,
+                fetcher=fetcher,
+                kind="result" if "result" in claim.data_kinds else "racecard",
+            )
         from stable.services.race_source_identity import resolve_observation
 
         if route.provider=='us_racing' or route.parser_version=='uk-tra-paid-v1':now=timezone.now()
@@ -1006,18 +1012,16 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
                     **row.get("field_provenance", {}),
                     "multisource_source_set_digest": locked.enrollment.source_set_digest,
                 }
-            if value.get("result_phase") not in (
-                "official",
-                "corrected",
-            ) or not value.get("roster_complete"):
-                raise ValueError("not_published")
+            complete_result = (value.get("result_phase") in ("official", "corrected")
+                               and value.get("roster_complete") is True)
+            phase = value["result_phase"] if complete_result else "provisional"
             payload = dict(
                 external_race_id=value["external_race_id"],
                 off_time=value.get("off_time", ""),
                 region=route.region,
                 course=value["venue_key"],
                 race_name=value["raw_names"][0],
-                race_status="complete",
+                race_status="complete" if complete_result else "provisional",
                 participants=value["roster"],
             )
             if france_basic:
@@ -1028,7 +1032,7 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
                 source_updated_at=None,
                 parser_version=route.parser_version,
                 raw_sha256=value["raw_sha256"],
-                result_phase=value["result_phase"],
+                result_phase=phase,
                 normalized_payload=payload,
                 field_provenance=provenance,
                 parse_warnings=[],
@@ -1047,6 +1051,8 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
                 correction_apply_enabled=settings.RACE_DATA_SYNC_CORRECTION_APPLY_ENABLED,
                 claim_guard=claim,
             )
+            if not complete_result:
+                raise ValueError("result_incomplete")
             if projected.action not in ("applied", "replayed"):
                 raise ValueError(projected.reason_code or "result_not_applied")
             applied.append("result")
@@ -1250,6 +1256,7 @@ def parse_nar_observation(page, *, url, route, now):
         raise ValueError("nar_name_missing")
     is_result = urlsplit(url).path.endswith("RaceMarkTable")
     rows = []
+    complete_rows = True
     if is_result:
         table = soup.select_one("section.gradeTable table")
         if not table:
@@ -1267,7 +1274,8 @@ def parse_nar_observation(page, *, url, route, now):
                 for c in tr.find_all(["td", "th"], recursive=False)
             ]
             if len(cells) < (15 if banei_layout else 16):
-                raise ValueError("nar_result_partial")
+                complete_rows = False
+                continue
             place = cells[0]
             pos = int(place) if place.isdigit() else None
             status = (
@@ -1367,8 +1375,8 @@ def parse_nar_observation(page, *, url, route, now):
         race_number=race_no,
         raw_names=[title.get_text(" ", strip=True)],
         roster=rows,
-        result_phase="official" if is_result else "",
-        roster_complete=True,
+        result_phase=("official" if complete_rows and all(r["status"] != "unknown" for r in rows) else "provisional") if is_result else "",
+        roster_complete=complete_rows and all(r["status"] != "unknown" for r in rows),
     )
     import unicodedata
     clean_name = unicodedata.normalize('NFKC', value['raw_names'][0])
@@ -1436,14 +1444,15 @@ def parse_hkjc_observation(page, *, url, route, now):
     ]
     if len(venues) != 1 or venues[0] != f"hkjc:{course}":
         raise ValueError("hkjc_course_mismatch")
-    # Count actual rows, not only parser-accepted rows; partial result tables fail closed.
+    # 缺行仍可提供冠军证据，但不能冒充完整正式赛果。
     tables = [
         t
         for t in soup.select("table")
         if all(label in t.get_text(' ', strip=True) for label in ('Pla.', 'Horse No.', 'Finish Time', 'Jockey', 'Trainer'))
     ]
-    if len(tables) != 1 or len(tables[0].select("tr")) - 1 != len(parsed["results"]):
+    if len(tables) != 1:
         raise ValueError("hkjc_result_partial")
+    complete_rows = len(tables[0].select("tr")) - 1 == len(parsed["results"])
     rows = []
     for r in parsed["results"]:
         raw = r["finish_position"]
@@ -1516,8 +1525,8 @@ def parse_hkjc_observation(page, *, url, route, now):
         race_number=number,
         raw_names=[parsed["race_name"]],
         roster=rows,
-        result_phase="official",
-        roster_complete=True,
+        result_phase="official" if complete_rows else "provisional",
+        roster_complete=complete_rows,
     )
     from .hkjc_sources import result_roster_evidence
     evidence = result_roster_evidence(soup, rows, url=url, raw_sha256=value['raw_sha256'])

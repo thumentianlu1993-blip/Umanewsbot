@@ -283,6 +283,16 @@ if [ "$race_data_sync_current" = "running" ]; then
   expected_workers="${expected_workers:+$expected_workers }$race_data_sync_node"
 fi
 
+# 赛事控制和临场取数为常驻独立 worker；与普通 worker 一起 drain。
+for priority_service in race_control_worker race_realtime_worker; do
+  priority_probe="$(probe_service "$priority_service")" || exit 1
+  priority_state="$(printf '%s' "$priority_probe" | awk '{print $1}')"
+  priority_node="$(printf '%s' "$priority_probe" | awk '{print $2}')"
+  if [ "$priority_state" = "running" ]; then
+    expected_workers="${expected_workers:+$expected_workers }$priority_node"
+  fi
+done
+
 echo "release: stopping beat"
 "$COMPOSE" -f "$COMPOSE_FILE" stop beat
 
@@ -290,7 +300,7 @@ echo "release: waiting for all celery workers to drain"
 COMPOSE_FILE="$COMPOSE_FILE" EXPECTED_CELERY_WORKERS="$expected_workers" ./deploy/wait_for_celery_drain.sh
 
 echo "release: stopping worker"
-"$COMPOSE" -f "$COMPOSE_FILE" stop worker
+"$COMPOSE" -f "$COMPOSE_FILE" stop worker race_control_worker race_realtime_worker
 
 if [ "$race_live_current" = "running" ]; then
   echo "release: stopping race_live_worker (currently running)"
@@ -357,7 +367,8 @@ echo "release: waiting for web to become healthy"
 COMPOSE_FILE="$COMPOSE_FILE" SERVICE_NAME=web ./deploy/wait_for_compose_service_healthy.sh
 
 echo "release: starting worker, beat and nginx"
-"$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps worker beat nginx
+"$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps worker race_control_worker race_realtime_worker
+"$COMPOSE" -f "$COMPOSE_FILE" up -d --no-deps beat nginx
 
 if [ "$race_live_intent" = "running" ]; then
   echo "release: restoring race_live_worker (frozen restore intent)"

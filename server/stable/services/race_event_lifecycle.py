@@ -1,8 +1,7 @@
 """
 Race event lifecycle service — pure decision, atomic apply, claim, enrollment.
 
-Phase A: time-based transitions only. No providers, no news gate changes, no
-race-live dispatch.
+时间仅推进开赛。完赛由已准入来源的冠军证据驱动，不凭 T+30 或跨日推断。
 """
 
 from __future__ import annotations
@@ -166,15 +165,6 @@ def decide_race_lifecycle(
                 error_message="race_datetime must be aware datetime",
             )
 
-        finish_boundary = race_datetime + timedelta(minutes=30)
-        if now >= finish_boundary:
-            return LifecycleDecision(
-                action="transition",
-                to_status=RaceEventStatus.FINISHED,
-                reason_code="time_t_plus_30",
-                effective_at=now,
-            )
-
         if now >= race_datetime and status == RaceEventStatus.SCHEDULED:
             return LifecycleDecision(
                 action="transition",
@@ -183,7 +173,9 @@ def decide_race_lifecycle(
                 effective_at=now,
             )
 
-        return LifecycleDecision(action="noop", reason_code="before_race_datetime")
+        return LifecycleDecision(action="noop", reason_code=(
+            "awaiting_winner" if status == RaceEventStatus.RUNNING else "before_race_datetime"
+        ))
 
     # ── no race_datetime — use local_date ──
     if local_date is None:
@@ -192,16 +184,7 @@ def decide_race_lifecycle(
             error_message="neither race_datetime nor local_date provided",
         )
 
-    midnight_utc = _local_next_midnight(local_date, timezone_name)
-    if now >= midnight_utc:
-        return LifecycleDecision(
-            action="transition",
-            to_status=RaceEventStatus.FINISHED,
-            reason_code="local_next_day_midnight",
-            effective_at=now,
-        )
-
-    return LifecycleDecision(action="noop", reason_code="before_local_midnight")
+    return LifecycleDecision(action="noop", reason_code="awaiting_winner")
 
 
 # ── effective mode resolution ─────────────────────────────────────────
@@ -626,7 +609,7 @@ def _record_attempt(
         control.last_success_at = now
         control.consecutive_failures = 0
     elif result_code not in ("noop", "proposal_duplicate", "applied_duplicate",
-                              "before_race_datetime", "before_local_midnight",
+                              "before_race_datetime", "before_local_midnight", "awaiting_winner",
                               "generation_stale", "claim_not_expired",
                               "claim_generation_mismatch", "mode_off",
                               "effective_mode_off", "already_finished",
@@ -659,7 +642,7 @@ def _recompute_next_refresh(
         control.next_refresh_at = None
     elif effective_status == RaceEventStatus.RUNNING:
         if event.race_datetime:
-            control.next_refresh_at = event.race_datetime + timedelta(minutes=30)
+            control.next_refresh_at = now + timedelta(minutes=1)
         else:
             control.next_refresh_at = now + timedelta(hours=24)
     else:
@@ -696,7 +679,7 @@ def _bump_next_refresh_forward(
     ):
         control.next_refresh_at = None
     elif effective == RaceEventStatus.RUNNING and event.race_datetime:
-        control.next_refresh_at = event.race_datetime + timedelta(minutes=30)
+        control.next_refresh_at = now + timedelta(minutes=1)
     elif event.race_datetime and event.race_datetime > now:
         control.next_refresh_at = event.race_datetime
     else:

@@ -21,7 +21,7 @@ MANIFEST_SCHEMA = "release-0078-verified-backup-recovery/v1"
 INTENT_SCHEMA = "release-0078-prepared-intent/v1"
 MARKER_SCHEMA = "migration-history-repair-restricted-recovery/v3"
 MIGRATION_CONTRACT_SHA256 = "50c421f3167a8c2c8f1613a0597ad7ee196c249fc18bf7eed0de7b9cd2f80906"
-SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "nginx")
+SERVICES = ("web", "worker", "beat", "race_live_worker", "race_sync_v2_worker", "race_control_worker", "race_realtime_worker", "nginx")
 WRITER_FLAGS = (
     "RACE_LIVE_SCHEDULER_ENABLED", "RACE_LIVE_MONITOR_ENABLED",
     "RACE_DATA_SYNC_ENABLED", "RACE_DATA_SYNC_SCHEDULER_ENABLED",
@@ -241,6 +241,9 @@ def verify_manifest(path: Path, sha: str, bindings: dict) -> dict:
         raise ValueError("0078 backup bytes or file identity changed")
     if not hex_value(payload.get("pg_restore_list_sha256")) or type(payload.get("pg_restore_list_line_count")) is not int or payload["pg_restore_list_line_count"] <= 0:
         raise ValueError("0078 backup TOC proof is invalid")
+    initial = payload.get("initial_services", payload.get("restore_services"))
+    if not isinstance(initial, dict) or set(initial) != set(SERVICES) or any(type(v) is not bool for v in initial.values()):
+        raise ValueError("0078 initial service snapshot is invalid")
     return payload
 
 

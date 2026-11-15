@@ -53,7 +53,7 @@ python3 ./deploy/release_0078.py guard
 # Fail closed if any application service is running, restarting, or its
 # state cannot be read. No Compose `run` may happen before this gate. A
 # failing `compose ps -q` probe is a probe failure, never "not running".
-for service in web worker beat race_live_worker race_sync_v2_worker; do
+for service in web worker beat race_live_worker race_sync_v2_worker race_control_worker race_realtime_worker; do
   if ! ps_output="$("$COMPOSE" -f "$COMPOSE_FILE" ps -q "$service" 2>/dev/null)"; then
     echo "manual release: cannot list $service containers; failing closed" >&2
     exit 1

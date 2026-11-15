@@ -475,6 +475,10 @@ def select_due_race_data_sync_task() -> dict:
         enabled_regions=enabled_regions,
         enabled_data_kinds=enabled_data_kinds,
     )
+    from stable import models
+    from stable.services.race_priority import claim_queue, claim_priority
+    events = models.RaceEvent.objects.select_related("live_tracking").in_bulk(
+        [claim.event_id for claim in claims])
     for claim in claims:
         dispatch_kwargs = {
             "event_id": claim.event_id,
@@ -487,10 +491,14 @@ def select_due_race_data_sync_task() -> dict:
             "expected_enrollment_entry_sha256": claim.enrollment_entry_sha256,
             "expected_plan_sha256": claim.plan_sha256,
         }
+        event = events[claim.event_id]
+        queue = claim_queue(claim=claim, event=event,
+                            retry=event.live_tracking.consecutive_failures > 0)
+        priority = claim_priority(claim=claim, event=event,
+                                  retry=event.live_tracking.consecutive_failures > 0)
         transaction.on_commit(
-            lambda kwargs=dispatch_kwargs: sync_race_event_provider_task.apply_async(
-                kwargs=kwargs,
-                queue="race_sync_v2",
+            lambda kwargs=dispatch_kwargs, queue=queue, priority=priority: sync_race_event_provider_task.apply_async(
+                kwargs=kwargs, queue=queue, priority=priority,
             )
         )
     count = len(claims)
@@ -777,6 +785,9 @@ def sync_race_event_provider_task(
         )
         return run_multisource_claim(claim=claim, now=timezone.now())
 
+    from stable.services.race_priority import needs_priority_result, retry_delay
+    priority_result = False
+
     def fail_closed(reason: str) -> dict:
         now = timezone.now()
         decision = fail_race_data_sync_claim(
@@ -790,7 +801,7 @@ def sync_race_event_provider_task(
             expected_enrollment_entry_sha256=expected_enrollment_entry_sha256,
             expected_plan_sha256=expected_plan_sha256,
             reason_code=reason,
-            retry_at=now + timedelta(minutes=5),
+            retry_at=now + retry_delay(priority=priority_result, reason=reason, now=now),
             now=now,
         )
         return {
@@ -859,130 +870,133 @@ def sync_race_event_provider_task(
         )
     if locked_claim is None:
         return fail_closed(claim_decision.reason_code)
-    now = timezone.now()
-    if source.source_key != "the_racing_api":
-        try:
-            capacity = reserve_race_data_transport_capacity(
-                provider=source.source_key,
-                region_code=source.region_code,
-                now=now,
-                proposed_requests=route.request_budget,
-                max_response_bytes_per_request=2 * 1024 * 1024,
+    priority_result = "result" in data_kinds and needs_priority_result(locked_claim.event)
+    from stable.services.race_priority import result_transport_scope
+    with result_transport_scope(claim_guard):
+        now = timezone.now()
+        if source.source_key != "the_racing_api":
+            try:
+                capacity = reserve_race_data_transport_capacity(
+                    provider=source.source_key,
+                    region_code=source.region_code,
+                    now=now,
+                    proposed_requests=route.request_budget,
+                    max_response_bytes_per_request=2 * 1024 * 1024,
+                )
+            except (OSError, TypeError, ValueError):
+                return fail_closed("artifact_capacity_config_invalid")
+            if not capacity.allowed:
+                return fail_closed(capacity.reason_code)
+        provider_kwargs = {
+            "event_id": event_id,
+            "data_kinds": tuple(data_kinds),
+            "route": route,
+            "now": now,
+            "task_id": str(
+                getattr(sync_race_event_provider_task.request, "id", "")
+                or f"sync-{event_id}"
+            ),
+            "run_id": attempt_token,
+            "claim_guard": claim_guard,
+        }
+        if source.source_key == "the_racing_api":
+            outcome = run_the_racing_api_data_sync(**provider_kwargs)
+        elif source.source_key in {
+            "sporting_life",
+            "zeturf",
+            "horse_racing_nation",
+        }:
+            outcome = run_reference_result_data_sync(
+                **provider_kwargs,
+                capacity_reserved=True,
             )
-        except (OSError, TypeError, ValueError):
-            return fail_closed("artifact_capacity_config_invalid")
-        if not capacity.allowed:
-            return fail_closed(capacity.reason_code)
-    provider_kwargs = {
-        "event_id": event_id,
-        "data_kinds": tuple(data_kinds),
-        "route": route,
-        "now": now,
-        "task_id": str(
-            getattr(sync_race_event_provider_task.request, "id", "")
-            or f"sync-{event_id}"
-        ),
-        "run_id": attempt_token,
-        "claim_guard": claim_guard,
-    }
-    if source.source_key == "the_racing_api":
-        outcome = run_the_racing_api_data_sync(**provider_kwargs)
-    elif source.source_key in {
-        "sporting_life",
-        "zeturf",
-        "horse_racing_nation",
-    }:
-        outcome = run_reference_result_data_sync(
-            **provider_kwargs,
-            capacity_reserved=True,
-        )
-    else:
-        return fail_closed("provider_not_implemented")
-    fallback_reason = ""
-    if (
-        outcome.success
-        and source.source_key == "the_racing_api"
-        and models.RaceDataSyncDataKind.RESULT in outcome.not_found_kinds
-    ):
-        fallback = run_result_fallback_chain(
-            event_id=event_id,
-            excluded_providers=(source.source_key,),
-            now=now,
-            task_id=provider_kwargs["task_id"],
-            run_id=attempt_token,
-            claim_guard=claim_guard,
-        )
-        fallback_reason = fallback.reason_code
-        if fallback.success and fallback.applied_kinds:
-            outcome = type(outcome)(
-                success=True,
-                reason_code="complete",
-                observation_hashes={
-                    **outcome.observation_hashes,
-                    **fallback.observation_hashes,
-                },
-                source_updated_at_by_kind={
-                    **outcome.source_updated_at_by_kind,
-                    **fallback.source_updated_at_by_kind,
-                },
-                applied_kinds=tuple(
-                    dict.fromkeys(
-                        (*outcome.applied_kinds, *fallback.applied_kinds)
+        else:
+            return fail_closed("provider_not_implemented")
+        fallback_reason = ""
+        if (
+            outcome.success
+            and source.source_key == "the_racing_api"
+            and models.RaceDataSyncDataKind.RESULT in outcome.not_found_kinds
+        ):
+            fallback = run_result_fallback_chain(
+                event_id=event_id,
+                excluded_providers=(source.source_key,),
+                now=now,
+                task_id=provider_kwargs["task_id"],
+                run_id=attempt_token,
+                claim_guard=claim_guard,
+            )
+            fallback_reason = fallback.reason_code
+            if fallback.success and fallback.applied_kinds:
+                outcome = type(outcome)(
+                    success=True,
+                    reason_code="complete",
+                    observation_hashes={
+                        **outcome.observation_hashes,
+                        **fallback.observation_hashes,
+                    },
+                    source_updated_at_by_kind={
+                        **outcome.source_updated_at_by_kind,
+                        **fallback.source_updated_at_by_kind,
+                    },
+                    applied_kinds=tuple(
+                        dict.fromkeys(
+                            (*outcome.applied_kinds, *fallback.applied_kinds)
+                        )
+                    ),
+                    not_found_kinds=tuple(
+                        kind
+                        for kind in outcome.not_found_kinds
+                        if kind != models.RaceDataSyncDataKind.RESULT
+                    ),
+                )
+        if not outcome.success:
+            result = fail_closed(outcome.reason_code)
+            result["applied_kinds"] = outcome.applied_kinds
+            result["not_found_kinds"] = outcome.not_found_kinds
+            result["fallback_reason"] = fallback_reason
+            return result
+        if models.RaceDataSyncDataKind.RESULT in data_kinds:
+            from stable.services.race_data_sync_alerts import (
+                stage_data_sync_result_overdue_alert,
+            )
+
+            stage_data_sync_result_overdue_alert(
+                event_id=event_id,
+                now=timezone.now(),
+                reason_code=(
+                    fallback_reason
+                    or (
+                        "result_not_found"
+                        if models.RaceDataSyncDataKind.RESULT in outcome.not_found_kinds
+                        else outcome.reason_code
                     )
                 ),
-                not_found_kinds=tuple(
-                    kind
-                    for kind in outcome.not_found_kinds
-                    if kind != models.RaceDataSyncDataKind.RESULT
-                ),
             )
-    if not outcome.success:
-        result = fail_closed(outcome.reason_code)
-        result["applied_kinds"] = outcome.applied_kinds
-        result["not_found_kinds"] = outcome.not_found_kinds
-        result["fallback_reason"] = fallback_reason
-        return result
-    if models.RaceDataSyncDataKind.RESULT in data_kinds:
-        from stable.services.race_data_sync_alerts import (
-            stage_data_sync_result_overdue_alert,
-        )
-
-        stage_data_sync_result_overdue_alert(
+        decision = complete_race_data_sync_claim(
             event_id=event_id,
+            expected_enrollment_generation=expected_enrollment_generation,
+            expected_owner_generation=expected_owner_generation,
+            expected_claim_generation=expected_claim_generation,
+            attempt_token=attempt_token,
+            checkpoint_plan=checkpoint_plan or (),
+            expected_enrollment_entry_sha256=expected_enrollment_entry_sha256,
+            expected_plan_sha256=expected_plan_sha256,
+            observation_hashes=outcome.observation_hashes,
+            source_updated_at_by_kind=outcome.source_updated_at_by_kind,
             now=timezone.now(),
-            reason_code=(
-                fallback_reason
-                or (
-                    "result_not_found"
-                    if models.RaceDataSyncDataKind.RESULT in outcome.not_found_kinds
-                    else outcome.reason_code
-                )
-            ),
         )
-    decision = complete_race_data_sync_claim(
-        event_id=event_id,
-        expected_enrollment_generation=expected_enrollment_generation,
-        expected_owner_generation=expected_owner_generation,
-        expected_claim_generation=expected_claim_generation,
-        attempt_token=attempt_token,
-        checkpoint_plan=checkpoint_plan or (),
-        expected_enrollment_entry_sha256=expected_enrollment_entry_sha256,
-        expected_plan_sha256=expected_plan_sha256,
-        observation_hashes=outcome.observation_hashes,
-        source_updated_at_by_kind=outcome.source_updated_at_by_kind,
-        now=timezone.now(),
-    )
-    return {
-        "processed": decision.action == "complete",
-        "event_id": event_id,
-        "reason": outcome.reason_code,
-        "claim_action": decision.action,
-        "claim_reason": decision.reason_code,
-        "data_kinds": tuple(data_kinds),
-        "applied_kinds": outcome.applied_kinds,
-        "not_found_kinds": outcome.not_found_kinds,
-        "fallback_reason": fallback_reason,
-    }
+        return {
+            "processed": decision.action == "complete",
+            "event_id": event_id,
+            "reason": outcome.reason_code,
+            "claim_action": decision.action,
+            "claim_reason": decision.reason_code,
+            "data_kinds": tuple(data_kinds),
+            "applied_kinds": outcome.applied_kinds,
+            "not_found_kinds": outcome.not_found_kinds,
+            "fallback_reason": fallback_reason,
+        }
 
 
 @shared_task

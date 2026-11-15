@@ -138,11 +138,12 @@ def parse_geny_card(doc):
     return dict(external_race_id=key[1],local_date=key[2],roster=rows,roster_complete=True,result_phase='')
 
 
-def parse_geny_result(doc, card):
+def parse_geny_result(doc, card, *, allow_partial=False):
     key, card_key = geny_key(doc['url']),geny_key(card['url'])
     if key.groups()[:3]!=card_key.groups()[:3]:
         raise ValueError('geny_card_identity')
-    if 'ARRIVÉE DÉFINITIVE' not in doc.get('text','').upper():
+    final = 'ARRIVÉE DÉFINITIVE' in doc.get('text','').upper()
+    if not final and not allow_partial:
         raise ValueError('geny_result_not_final')
     value=parse_geny_card(card)
     from .france_basic_fields import digest
@@ -152,7 +153,8 @@ def parse_geny_result(doc, card):
             trainer_name=row['trainer_name'],carried_weight=row['carried_weight'],odds_value=row['odds_value'],
             adjusted_weight=row['field_provenance']['adjusted_weight'])
     count=re.search(r'(\d+)\s+partants',doc.get('text',''),re.I)
-    if not count or int(count[1])!=len(value['roster']):raise ValueError('geny_roster_count')
+    complete = bool(count and int(count[1])==len(value['roster']))
+    if not complete and not allow_partial:raise ValueError('geny_roster_count')
     results={}
     for result in doc.get('rows',[]):
         leaves=result.get('leaves',[])
@@ -166,7 +168,9 @@ def parse_geny_result(doc, card):
     for row in value['roster']:
         result=results.get(row['number'])
         if result is None:
-            if row['status']!='non_runner':raise ValueError('geny_missing_result')
+            if row['status']!='non_runner':
+                if not allow_partial:raise ValueError('geny_missing_result')
+                complete = False
             continue
         if row['status']=='non_runner':raise ValueError('geny_conflicting_nonrunner')
         raw=result['rank'];leaves=result['leaves']
@@ -188,7 +192,9 @@ def parse_geny_result(doc, card):
     positions=Counter(r['reported_finish_position'] for r in value['roster'] if r['reported_finish_position'])
     for row in value['roster']:
         if positions[row['reported_finish_position']]>1:row['status']='dead_heat'
-    value.update(result_phase='official',roster_complete=True)
+    if allow_partial and not any(r['reported_finish_position']==1 for r in value['roster']):
+        raise ValueError('geny_result_not_final')
+    value.update(result_phase='official' if final and complete else 'provisional',roster_complete=complete)
     return value
 
 
@@ -209,7 +215,7 @@ def parse_geny_observation(page, *, url, route, now, card_page=None):
     card_url=url.rsplit('/',1)[0]+'/partants-pronostics'
     if key[4]=='arrivee-rapports':
         if card_page is None:raise ValueError('geny_card_required')
-        value=parse_geny_result(doc,document_from_html(card_page,card_url))
+        value=parse_geny_result(doc,document_from_html(card_page,card_url),allow_partial=True)
     else:value=parse_geny_card(doc)
     soup=BeautifulSoup(str(page),'html.parser')
     tz=soup.select_one('meta[name="source-timezone"]')
