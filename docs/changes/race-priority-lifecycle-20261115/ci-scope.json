@@ -32,7 +32,7 @@
       "path": "deploy/release_0078.py",
       "status": "modified",
       "before_hash": "d6fc19799a62959abae72fbcb47ce06d0c92d8b87a5c6c090ca58d1658a22910",
-      "after_hash": "63478f441486ca4eb291ddfe7b5e9d3a103b06a4546d5ed40ba4dc382dc66ad9",
+      "after_hash": "b17c6c7073af9827634f23674e0e1a5f9c97316e54690c68daed36aa29fd8583",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -40,7 +40,7 @@
       "path": "deploy/release_0079.py",
       "status": "modified",
       "before_hash": "6e27d52bd5e0d3959268e297fc3efa4bf086c2c58749acbc3d3f3fc0430e63ec",
-      "after_hash": "86793e00fc501025ecb22f254b08647f8640254a3c8f8b3fff0e9cf1cada0f72",
+      "after_hash": "b5042b028a047b5e0044590119ed42b37265988a773e65631758ccd8be5abc14",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -88,7 +88,7 @@
       "path": "docs/changes/race-priority-lifecycle-20261115/design.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "f09557c0852bfaf4ae49677106cf6564f9cbdb1424312a7216a27d566687b46e",
+      "after_hash": "4f8d395bbd0864e7d2810fbda71744bcf5addbe7ae397a26319c0d58221cf994",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -120,7 +120,7 @@
       "path": "docs/changes/race-priority-lifecycle-20261115/tasks.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "8e990b27022736f5acc72f9525589f59e896982f712474610629ddfc632753a6",
+      "after_hash": "76b47964f5bd209378dbf567873e99c3aef7f321b0e1a9332b027b6bf8b09bad",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -176,7 +176,7 @@
       "path": "server/stable/services/race_data_sync_control.py",
       "status": "modified",
       "before_hash": "eb0752edbe3c463dfa8577e5232d2debdd47ee6fdf9f583e13d7e48b473ecc6b",
-      "after_hash": "a8b0a45941505e6ca8ae6fd6fddcd044dfc7588e229e2d183278eab5e37ae256",
+      "after_hash": "bc128ff12b50bf7205537129f5d1a2cb972a36b3d3806c18bd0710ed6847ebf9",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -232,7 +232,7 @@
       "path": "server/stable/services/release_0078_recovery.py",
       "status": "modified",
       "before_hash": "e142ce64b99d320f7992c0c572632a74eaf92df81db99ac84950cce4978f29da",
-      "after_hash": "338ddb9e95986905bca8d4a41a0537e724b1e6a5e9ec7a004574d8ec341ec15c",
+      "after_hash": "16268ecb0b7595536995495bf9857a288f0c244f59f82e79e8291cc80b247b97",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -240,7 +240,7 @@
       "path": "server/stable/services/release_0079_recovery.py",
       "status": "modified",
       "before_hash": "11acc44b154d72741ed2c61cc75d045a19438aa027f78dee8cf172cdfc080b35",
-      "after_hash": "9177ecee489d48a5f87f209aedf8e4a98a6b7fb502e7c02dcd5b6edead99c0ad",
+      "after_hash": "341c7053a10a679c38c089f4cc9ab026c098c216ebacc81057781d22b57106c3",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -304,7 +304,7 @@
       "path": "server/stable/test_race_data_sync_r0.py",
       "status": "modified",
       "before_hash": "e697668eca3fe71f046d35b209b60317ff0cfb71a95200847ca174e0618e2dd5",
-      "after_hash": "3479ff55a6a8d7668e5da61dc863f20b625665c63a94c712321d174b425d7d1a",
+      "after_hash": "620167601091c63b703af47bfe3541c1d759167eb313f72b5cff162dc54eda23",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -344,7 +344,7 @@
       "path": "server/stable/test_race_multisource_jra.py",
       "status": "modified",
       "before_hash": "6f26f0d1b0a453633e697741f083b0b546a2424b678b64638842b2921bcd9e98",
-      "after_hash": "777098926c8cb7d28172bb7659dc24c5e4dbb58bdf98e564605ee4f324deb13b",
+      "after_hash": "375f0b8173de67d2aff8b8da515934812cd394b38b0de8d48ba1d2de486e7b82",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -360,7 +360,7 @@
       "path": "server/stable/test_release_0078_entrypoints.py",
       "status": "modified",
       "before_hash": "34a59fa884fb72b811bf7cc2d807cb2cf3f31615ad0507e12285944098fa7bf8",
-      "after_hash": "49aafa091cb7d92e0051c378cd3869f1751dfb1da2816cd29123bc6d725f4e90",
+      "after_hash": "5a09286bad768a25ff44c3f8d8c5bfa7bd010b46fe92cdb72d758c78f0c6a4de",
       "before_mode": "100644",
       "after_mode": "100644"
     },
@@ -384,7 +384,7 @@
       "path": "server/stable/test_single_migration_owner.py",
       "status": "modified",
       "before_hash": "54f5d490d127ae196c7ab4584bba94a39bc964051350a219c73d51b2ce66aec3",
-      "after_hash": "6aae675d440d5effa69f767eb03e77e0495ef65b6c2d69b92262a1ecabdc6b46",
+      "after_hash": "9dc731cf667de94456ac024002abf9b7d80c489f8e91b5d6e56ae8a3f70442a6",
       "before_mode": "100644",
       "after_mode": "100644"
     },

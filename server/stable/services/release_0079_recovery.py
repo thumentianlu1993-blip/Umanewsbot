@@ -211,6 +211,9 @@ def verify_manifest(path: Path, sha: str, bindings: dict) -> dict:
         or payload["pg_restore_list_line_count"] <= 0
     ):
         raise ValueError("0079 backup TOC proof is invalid")
+    initial = payload.get("initial_services", payload.get("restore_services"))
+    if not isinstance(initial, dict) or set(initial) != set(SERVICES) or any(type(v) is not bool for v in initial.values()):
+        raise ValueError("0079 initial service snapshot is invalid")
     return payload
 
 

@@ -208,7 +208,7 @@ def prepare(env, *, resume):
         intent, manifest = contract.verify_intent(intent_path, identity["sha256"], expected, active_required=active)
         if not active and not os.path.lexists(release_dir / "complete.json"):
             actual = {service: probe(service, env)["running"] for service in contract.SERVICES}
-            if actual != intent["restore_services"]:
+            if actual != manifest.get("initial_services", intent["restore_services"]):
                 raise ValueError("0078 cannot prove preparation stopped before the first service action")
         if intent["config_sha256"] != config_sha():
             raise ValueError("0078 configuration changed since preparation")
@@ -225,7 +225,8 @@ def prepare(env, *, resume):
             verify_service_flags(service, current, env, original_flags)
         if origin["handoff_action"] == "manual-release" and any(services[service]["running"] for service in contract.SERVICES if service != "nginx"):
             raise ValueError("manual 0078 release requires stopped application services")
-        restore = {service: values["running"] for service, values in services.items()}
+        initial_services = {service: values["running"] for service, values in services.items()}
+        restore = dict(initial_services)
         # 正常在线升级首次引入两个常驻 worker；manual-release 仍保留停服意图。
         if origin["handoff_action"] == "deploy" and (restore["worker"] or restore["beat"]):
             restore.update(race_control_worker=True, race_realtime_worker=True)
@@ -233,7 +234,9 @@ def prepare(env, *, resume):
             if not resume or not env.get("RELEASE_0078_RECOVERY_MANIFEST_SHA256"):
                 raise ValueError("0078 backup proof exists; resume with its original SHA")
             manifest = contract.verify_manifest(manifest_path, env["RELEASE_0078_RECOVERY_MANIFEST_SHA256"], expected)
-            if manifest["restore_services"] != restore or manifest["config_sha256"] != config_sha():
+            if (manifest["restore_services"] != restore
+                    or manifest.get("initial_services", manifest["restore_services"]) != initial_services
+                    or manifest["config_sha256"] != config_sha()):
                 raise ValueError("0078 cannot prove the original preparation boundary")
         else:
             backup_dir = release_dir / "backup"
@@ -280,7 +283,7 @@ def prepare(env, *, resume):
                 "backup_path": str(backup), "backup_file": evidence,
                 "pg_restore_list_sha256": hashlib.sha256(toc.encode("utf-8")).hexdigest(),
                 "pg_restore_list_line_count": len(toc.splitlines()),
-                "restore_services": restore, "config_sha256": config_sha(),
+                "restore_services": restore, "initial_services": initial_services, "config_sha256": config_sha(),
                 "writer_flags": original_flags,
                 "initial_lock_sha256": origin["deployment_lock_token_sha256"],
             }

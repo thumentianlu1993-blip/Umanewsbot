@@ -445,6 +445,21 @@ class Release0078EntrypointTests(TestCase):
         for name in ("race_control_worker", "race_realtime_worker"):
             self.assertLess(events.index("start-after-completion:" + name), events.index("start-after-completion:beat"))
 
+    def test_first_missing_workers_resume_after_active_publication_failure(self):
+        harness = self.harness()
+        initial = harness.state()
+        for name in ("race_control_worker", "race_realtime_worker"):
+            initial["services"].pop(name, None)
+        (harness.root / "test-state.json").write_text(json.dumps(initial))
+        self.assertNotEqual(harness.initial("active-before-write").returncode, 0)
+        self.assertFalse(any(e.startswith("stop-with-") for e in harness.events()))
+        self.assert_success(harness.resume())
+        self.assertEqual(harness.state()["services"], harness.restore)
+        manifest = contract.read_json(harness.directory / "manifest.json")[0]
+        self.assertFalse(manifest["initial_services"]["race_control_worker"])
+        self.assertTrue(manifest["restore_services"]["race_control_worker"])
+        self.assertEqual(harness.events().count("backup-created"), 1)
+
     def test_live_flags_release_preserves_enabled_services_and_disarms_full_control_chain(self):
         for leaf, compose in ((TARGET, "docker-compose.prod.yml"), (SOURCE, "docker-compose.prod.lowcost.yml")):
             with self.subTest(leaf=leaf, compose=compose):

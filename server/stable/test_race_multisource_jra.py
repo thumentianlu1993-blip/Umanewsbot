@@ -97,10 +97,15 @@ class JraColdStartTests(TestCase):
             enabled_data_kinds=("result",),
         )[0]
 
-    def _assert_selector_priority(self, *, failures, expected_queue, expected_priority):
+    def _assert_selector_priority(self, *, failures, expected_queue, expected_priority, expired=False):
         from stable.tasks import select_due_race_data_sync_task
         self.enroll()
-        tracking = self.event.live_tracking
+        if expired:
+            self.claim()
+        tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
+        if expired:
+            tracking.claim_expires_at = NOW - timedelta(seconds=1)
+            tracking.save(update_fields=("claim_expires_at",))
         tracking.consecutive_failures = failures
         tracking.save(update_fields=("consecutive_failures",))
         with patch("stable.tasks.sync_race_event_provider_task.apply_async") as dispatch, \
@@ -115,6 +120,10 @@ class JraColdStartTests(TestCase):
 
     def test_selector_sends_retry_with_high_message_priority(self):
         self._assert_selector_priority(failures=1, expected_queue="race_realtime_retry", expected_priority=0)
+
+    def test_expired_worker_claim_is_reissued_at_retry_priority(self):
+        self._assert_selector_priority(failures=0, expired=True,
+                                      expected_queue="race_realtime_retry", expected_priority=0)
 
     def test_cold_start_result_only_full_chain(self):
         self.enroll()

@@ -867,6 +867,7 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         self.assertEqual(decision.reason_code, "claim_cas_stale")
         tracking = models.RaceEventLiveTracking.objects.get(event=self.event)
         self.assertEqual(tracking.active_attempt_token, second.attempt_token)
+        self.assertEqual(tracking.consecutive_failures, 1)
 
     def test_expired_provider_task_cannot_complete_or_release_claim(self):
         self._acquire()

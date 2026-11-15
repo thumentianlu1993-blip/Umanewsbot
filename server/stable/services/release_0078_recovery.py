@@ -241,6 +241,9 @@ def verify_manifest(path: Path, sha: str, bindings: dict) -> dict:
         raise ValueError("0078 backup bytes or file identity changed")
     if not hex_value(payload.get("pg_restore_list_sha256")) or type(payload.get("pg_restore_list_line_count")) is not int or payload["pg_restore_list_line_count"] <= 0:
         raise ValueError("0078 backup TOC proof is invalid")
+    initial = payload.get("initial_services", payload.get("restore_services"))
+    if not isinstance(initial, dict) or set(initial) != set(SERVICES) or any(type(v) is not bool for v in initial.values()):
+        raise ValueError("0078 initial service snapshot is invalid")
     return payload
 
 

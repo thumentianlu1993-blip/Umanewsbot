@@ -1916,6 +1916,9 @@ def claim_due_enrollments(
             ):
                 continue
             token = secrets.token_hex(16)
+            if tracking.active_attempt_token:
+                # 未完成且已过期的 lease 视为中断重试；busy lease 已在锁内拒绝。
+                tracking.consecutive_failures += 1
             tracking.claim_generation += 1
             tracking.active_attempt_token = token
             tracking.claim_expires_at = now + timedelta(seconds=ttl_seconds)
@@ -1926,6 +1929,7 @@ def claim_due_enrollments(
                     "active_attempt_token",
                     "claim_expires_at",
                     "last_attempt_at",
+                    "consecutive_failures",
                     "updated_at",
                 )
             )
@@ -2854,6 +2858,8 @@ def _claim_multisource_due(
                     proof_digest=binding.proof_digest,
                 )
                 token = secrets.token_hex(16)
+                if tracking.active_attempt_token:
+                    tracking.consecutive_failures += 1
                 tracking.claim_generation += 1
                 tracking.active_attempt_token = token
                 tracking.claim_expires_at = now + timedelta(seconds=ttl_seconds)

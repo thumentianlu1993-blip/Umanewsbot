@@ -2615,7 +2615,7 @@ class PreContractRollbackBridgeTests(SimpleTestCase):
             )
             up_downstream = index(
                 lambda e: e[0] == "compose"
-                and e[2] == ["up", "-d", "--no-deps", "worker", "race_control_worker", "race_realtime_worker"],
+                and e[2] == ["up", "-d", "--no-deps", "worker", "beat", "nginx"],
                 "up worker beat nginx",
             )
             up_race_live = index(
@@ -3766,7 +3766,7 @@ class RaceDataSyncWorkerReleaseStateTests(SimpleTestCase):
         self.assertLess(events.index('drain'),events.index('stop-with-verified-intent:race_sync_v2_worker'))
         self.assertLess(events.index('stop-with-verified-intent:race_sync_v2_worker'),events.index('stop-with-verified-intent:web'))
         self.assertEqual(events.count('start-after-completion:race_sync_v2_worker'),1)
-        self.assertIn('drain-nodes:node-worker node-race_sync_v2_worker',events)
+        self.assertIn('drain-nodes:node-worker node-race_sync_v2_worker node-race_control_worker node-race_realtime_worker',events)
         self.assertFalse((h.directory.parent/'active.json').exists())
 
 
