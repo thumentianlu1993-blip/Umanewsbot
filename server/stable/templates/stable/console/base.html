@@ -38,6 +38,7 @@
         </div>
         <div class="nav-section">
           <div class="nav-title">工作区</div>
+          <a class="nav-link" href="{% url 'console-news-quality-queue' %}"><span>新闻质量审核</span></a>
           <a class="nav-link {% if active_path == '/admin/' %}active{% endif %}" href="{% url 'console-dashboard' %}">
             <span>工作台</span>
           </a>

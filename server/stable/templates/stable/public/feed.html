@@ -58,7 +58,13 @@
           {% include "stable/public/_flash_race.html" %}
         {% endif %}
 
-        {% include "stable/public/_pagination.html" %}
+        {% if p01_feed %}
+          <nav class="pagination" aria-label="分页">
+            {% if public_previous_url %}<a href="{{ public_previous_url }}">返回本轮首页</a>{% endif %}
+            {% if public_next_url %}<a href="{{ public_next_url }}">下一页</a>{% endif %}
+            <a href="{% url 'public-news-archive' %}">新闻档案与搜索</a>
+          </nav>
+        {% else %}{% include "stable/public/_pagination.html" %}{% endif %}
       </section>
 
       {% include "stable/public/_hot_list.html" %}

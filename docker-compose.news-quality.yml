@@ -1,0 +1,33 @@
+# 与现有 Compose 文件叠加；新 worker 仅在 news-quality profile 中启动。
+# 所有新闻进程读取同一只读策略文件和 SHA，不新增来源或真实模型权限。
+x-news-quality-policy: &news-quality-policy
+  - ${NEWS_QUALITY_POLICY_DIR:-./runtime/news_quality/policies}:/run/news-quality:ro
+services:
+  web:
+    volumes: *news-quality-policy
+  worker:
+    volumes: *news-quality-policy
+  beat:
+    volumes: *news-quality-policy
+  news_quality_worker:
+    profiles: [news-quality]
+    image: ${UMANEWS_NEWS_QUALITY_IMAGE:-umanewsbot:prod}
+    command: /app/deploy/docker/start-news-quality-worker.sh
+    env_file: [.env]
+    environment:
+      DB_ENGINE: ${DB_ENGINE:-postgres}
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+    volumes:
+      - ${NEWS_QUALITY_POLICY_DIR:-./runtime/news_quality/policies}:/run/news-quality:ro
+      - app_logs:/app/logs
+    mem_limit: ${NEWS_QUALITY_WORKER_MEMORY_LIMIT:-768M}
+    cpus: ${NEWS_QUALITY_WORKER_CPUS:-1}
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_started
+      web:
+        condition: service_started
+volumes:
+  app_logs:

@@ -791,6 +791,8 @@ class NewsArticleAdmin(admin.ModelAdmin):
         return super().formfield_for_choice_field(db_field, request, **kwargs)
 
     def get_readonly_fields(self, request, obj=None):
+        if obj and obj.active_news_run_id:
+            return tuple(field.name for field in obj._meta.fields)
         fields = super().get_readonly_fields(request, obj)
         return fields if qq_channel_enabled() else tuple(f for f in fields if f != "push_action_link")
 

@@ -24,8 +24,8 @@ RECOVERY_MODULES = {
 RECOVERY_MODULE = RECOVERY_MODULES["0078"][1]
 
 POST_GENERATION_MIGRATIONS = {
-    "0078": {"0079_multisource_race_enrollment.py", "0080_translation_retry_budget.py", "0081_managed_readonly_steps.py", "0082_france_basic_fields.py", "0083_merge_france_basic_fields.py", "0084_race_event_division_parent.py", "0085_merge_us_divisions.py"},
-    "0079": {"0080_translation_retry_budget.py", "0081_managed_readonly_steps.py", "0082_france_basic_fields.py", "0083_merge_france_basic_fields.py", "0084_race_event_division_parent.py", "0085_merge_us_divisions.py"},
+    "0078": {"0079_multisource_race_enrollment.py", "0080_translation_retry_budget.py", "0081_managed_readonly_steps.py", "0082_france_basic_fields.py", "0083_merge_france_basic_fields.py", "0084_race_event_division_parent.py", "0085_merge_us_divisions.py", "0086_p01_news_quality.py", "0087_p01_immutable_publication.py", "0088_p01_sealed_evidence.py"},
+    "0079": {"0080_translation_retry_budget.py", "0081_managed_readonly_steps.py", "0082_france_basic_fields.py", "0083_merge_france_basic_fields.py", "0084_race_event_division_parent.py", "0085_merge_us_divisions.py", "0086_p01_news_quality.py", "0087_p01_immutable_publication.py", "0088_p01_sealed_evidence.py"},
 }
 
 

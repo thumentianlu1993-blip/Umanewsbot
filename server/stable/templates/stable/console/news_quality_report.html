@@ -1,0 +1,9 @@
+{% extends "stable/console/base.html" %}
+{% block title %}新闻七天观测{% endblock %}
+{% block content %}
+<h2>最近七天新闻观测</h2><p>{{ report.window.start }} — {{ report.window.end }}</p>
+<p>本页为数据库只读摘要。独立重大事件清单、完整访问日志和公开页面探针需在证据报告中一并对账；当前状态：{{ report.status }}。</p>
+<table><thead><tr><th>地区</th><th>发现</th><th>入选事件</th><th>质量通过事件</th><th>公开事件</th><th>供给缺口</th></tr></thead><tbody>{% for region, row in regions %}<tr><td>{{ region }}</td><td>{{ row.discovered }}</td><td>{{ row.selected_events }}</td><td>{{ row.qualified_events }}</td><td>{{ row.published_events }}</td><td>{{ row.supply_gap }}</td></tr>{% endfor %}</tbody></table>
+<p>成功响应曝光：{{ report.exposure.status }}。来源时间未知单列；超过1小时或北京自然日目标的稿件如实记为逾期，不改变质量结论。</p>
+<details><summary>查看完整指标、缺口与费用账</summary><pre>{{ details }}</pre></details>
+{% endblock %}

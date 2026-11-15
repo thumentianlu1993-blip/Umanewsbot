@@ -11,6 +11,8 @@ def healthcheck(_request):
     return JsonResponse({"status": "ok"})
 
 
+from stable import news_public_views
+
 urlpatterns = [
     path("", stable_views.public_news_feed, name="public-news-feed"),
     path("races/", stable_views.public_race_calendar, name="public-race-calendar"),
@@ -21,6 +23,8 @@ urlpatterns = [
     path("horses/follows/", stable_views.public_horse_follows, name="public-horse-follows"),
     path("horses/<int:profile_id>/", stable_views.public_horse_detail, name="public-horse-detail"),
     path("horses/<int:profile_id>/follow/", stable_views.public_horse_follow, name="public-horse-follow"),
+    path("news/stories/<uuid:receipt_id>/", news_public_views.receipt_detail, name="public-news-story"),
+    path("news/archive/", news_public_views.archive, name="public-news-archive"),
     path("news/<int:article_id>/", stable_views.public_article_detail, name="public-article-detail"),
     path("news/<str:slug>/", stable_views.legacy_public_article_detail, name="legacy-public-article-detail"),
     path("admin/", include("stable.urls")),

@@ -222,6 +222,9 @@ def automation_content_source() -> str:
 
 
 def prepare_base_translation_for_publish(article: NewsArticle) -> list[str]:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return []
     manual_fields = set(article.manually_edited_fields or [])
     updated: list[str] = []
     if "title_zh" not in manual_fields and not article.title_zh and article.translated_title_zh:
@@ -803,6 +806,9 @@ def mark_publish_ready(
     refresh_ready_at: bool = False,
 ) -> None:
     # Safety gate: verify term consistency before marking publish-ready.
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return
     # Only active when TERM_CONSISTENCY_ENABLED is set, to avoid adding
     # queries to existing automation paths.  When the gate finds blockers,
     # route to manual review instead.
@@ -868,6 +874,9 @@ def mark_publish_ready(
 
 
 def is_ready_for_auto_publish(article: NewsArticle) -> bool:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return False
     if article.review_mode != ReviewMode.AUTO:
         return False
     if article.automation_status != AutomationStatus.PUBLISH_READY:
@@ -884,12 +893,17 @@ def is_ready_for_auto_publish(article: NewsArticle) -> bool:
 
 
 def publish_article_automatically(article: NewsArticle) -> None:
+    from stable.services.news_pipeline import is_pipeline_article
+
+    if is_pipeline_article(article):
+        return
     article.workflow_status = WorkflowStatus.PUBLISHED
     article.automation_status = AutomationStatus.AUTO_PUBLISHED
     article.published_by_mode = PublishedByMode.AUTO
     article.auto_publish_at = timezone.now()
     article.published_to_web_at = article.published_to_web_at or article.auto_publish_at
-    article.save(
+    from stable.services.news_feed import save_legacy_publication
+    save_legacy_publication(article,
         update_fields=[
             "workflow_status",
             "automation_status",

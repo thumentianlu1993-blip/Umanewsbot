@@ -560,6 +560,8 @@ def _locked_translation_claim(
     run = TranslationRun.objects.select_for_update().filter(pk=run_id, article_id=article_id).first()
     if article is None or run is None:
         return article, run, "claim_changed"
+    if article.active_news_run_id:
+        return article, run, "p01_owned"
     raw = run.raw_response if isinstance(run.raw_response, dict) else {}
     claim = raw.get(CLAIM_KEY)
     if not isinstance(claim, dict) or claim.get("claimed_at") != claimed_at:
@@ -1262,6 +1264,8 @@ from stable.tasks import translate_article_task  # noqa: E402
 def _apply_translation_result_locked(article, result, now):
     """调用方已锁Article/Run并验证应用权限；只复用原文章字段写入。"""
     from stable.models import ArticleStatus
+    if article.active_news_run_id:
+        return
     article.apply_translation_result(result)
     article.status = ArticleStatus.TRANSLATED
     article.translation_status = ArticleTranslationStatus.TRANSLATED

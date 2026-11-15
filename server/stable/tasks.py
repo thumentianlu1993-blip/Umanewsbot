@@ -1354,6 +1354,9 @@ def _can_coalesce_old_window(window: ProductionWindow, *, now: datetime) -> bool
 
 
 def _auto_translate_article_after_ingest(article: NewsArticle) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not getattr(settings, "AUTO_TRANSLATE_ON_INGEST", True):
         return None
     try:
@@ -1365,6 +1368,9 @@ def _auto_translate_article_after_ingest(article: NewsArticle) -> dict | None:
 
 
 def _discover_terms_after_ingest(article: NewsArticle) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not getattr(settings, "TERM_DISCOVERY_ENABLED", False):
         return None
     try:
@@ -1374,6 +1380,9 @@ def _discover_terms_after_ingest(article: NewsArticle) -> dict | None:
 
 
 def _qq_push_after_source_elevation(article: NewsArticle, *, source_elevated: bool) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not source_elevated or not qq_channel_enabled() or not getattr(settings, "QQ_PUSH_ENABLED", False) or not is_article_public(article):
         return None
     try:
@@ -1383,6 +1392,9 @@ def _qq_push_after_source_elevation(article: NewsArticle, *, source_elevated: bo
 
 
 def _ranked_revival_after_source_elevation(article: NewsArticle, *, source_elevated: bool) -> dict | None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        return {"article_id": article.id, "skipped": True, "reason": "p01_owned"}
     if not source_elevated or is_article_public(article):
         return None
     try:
@@ -1403,6 +1415,7 @@ def _ranked_revival_after_source_elevation(article: NewsArticle, *, source_eleva
 
 
 def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None) -> dict:
+    from stable.services.news_discovery import discover_listing, fetch_discovered_detail, record_failure
     adapter = NetkeibaAdapter()
     job = _start_crawl_job(source)
     new_count = 0
@@ -1410,11 +1423,11 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
     ranked_revival_results: list[dict] = []
     try:
         for page in range(1, pages + 1):
-            stubs = adapter.fetch_listing(mode, page)
+            stubs = discover_listing(adapter, source, job, mode, page)
             if not stubs:
                 break
             for stub in stubs:
-                detail = adapter.fetch_detail(stub.source_article_id)
+                detail = fetch_discovered_detail(adapter, job, stub, stub.source_article_id)
                 draft = adapter.normalize_source_payload(stub, detail)
                 upsert_result = upsert_article_from_draft(draft, crawl_job=job)
                 article, created = upsert_result
@@ -1456,6 +1469,7 @@ def _crawl_netkeiba_mode(mode: str, pages: int, source: NewsSource | None = None
 
 
 def _crawl_jra_source(source: NewsSource | None = None) -> dict:
+    from stable.services.news_discovery import discover_listing, fetch_discovered_detail, record_failure
     adapter = JRAAdapter()
     job = _start_crawl_job(source)
     months = {
@@ -1467,9 +1481,9 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
     skipped_errors: list[str] = []
     try:
         for month in sorted(months):
-            for stub in adapter.fetch_listing(SourceMode.OFFICIAL, month):
+            for stub in discover_listing(adapter, source, job, SourceMode.OFFICIAL, month):
                 try:
-                    detail = adapter.fetch_detail(stub.source_url)
+                    detail = fetch_discovered_detail(adapter, job, stub, stub.source_url)
                 except JRA_SKIPPABLE_DETAIL_ERRORS as exc:
                     skipped_errors.append(f"{stub.source_url}: {exc}")
                     continue
@@ -1505,6 +1519,7 @@ def _crawl_jra_source(source: NewsSource | None = None) -> dict:
 
 
 def _crawl_international_source(source: NewsSource) -> dict:
+    from stable.services.news_discovery import discover_listing, fetch_discovered_detail, record_failure
     adapter_class = INTERNATIONAL_ADAPTERS.get(source.adapter_key)
     if adapter_class is None:
         raise NotImplementedError(f"未支持的国际新闻适配器：{source.adapter_key}")
@@ -1516,9 +1531,9 @@ def _crawl_international_source(source: NewsSource) -> dict:
     ranked_revival_results: list[dict] = []
     unverified_time_count = 0
     try:
-        for stub in adapter.fetch_listing(source.source_mode, 1):
+        for stub in discover_listing(adapter, source, job, source.source_mode, 1):
             try:
-                detail = adapter.fetch_detail(stub.source_url)
+                detail = fetch_discovered_detail(adapter, job, stub, stub.source_url)
                 draft = adapter.normalize_source_payload(stub, detail)
                 draft_metadata = getattr(draft, "metadata", {}) or {}
                 body_parse_status = draft_metadata.get("body_parse_status")
@@ -1533,6 +1548,7 @@ def _crawl_international_source(source: NewsSource) -> dict:
                 if draft_metadata.get("published_at_verified") is False:
                     unverified_time_count += 1
             except Exception as exc:
+                record_failure(job, stub, exc)
                 detail_errors.append(f"{stub.source_url}: {exc}")
                 continue
             upsert_result = upsert_article_from_draft(draft, crawl_job=job)
@@ -1882,6 +1898,8 @@ def discover_term_candidates_task(article_id: int) -> dict:
 
 
 def _translate_managed_claim_task(article_id, run_id, claimed_at, *, suppress_automation, log):
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     from django.db import connection, transaction
     from stable.services.translation_recovery import (
         CLAIM_KEY, TranslationCheckpointError, build_translation_checkpoint, finalize_translation_claim,
@@ -1971,6 +1989,8 @@ def translate_article_task(
     claim_started_at: str = "",
     readonly_job_uuid: str = "",
 ) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     from stable.services.translation_recovery import _current_offline_budget_binding
     log = _log_start(
         "translate_article",
@@ -2116,6 +2136,8 @@ def recover_stale_translations_task() -> dict:
 
 @shared_task
 def process_article_automation_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("process_article_automation", {"article_id": article_id})
     if not getattr(settings, "AUTOMATION_ENABLED", False):
         _log_success(log, "automation disabled")
@@ -2157,6 +2179,8 @@ def process_article_automation_task(article_id: int) -> dict:
 
 @shared_task
 def score_article_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("score_article", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     try:
@@ -2185,6 +2209,8 @@ def score_article_task(article_id: int) -> dict:
 
 @shared_task
 def rewrite_article_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("rewrite_article", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     if article.review_mode != ReviewMode.AUTO:
@@ -2207,6 +2233,8 @@ def rewrite_article_task(article_id: int) -> dict:
 
 @shared_task
 def validate_rewrite_task(article_id: int) -> dict:
+    if NewsArticle.objects.filter(pk=article_id, active_news_run__isnull=False).exists():
+        return {"article_id": article_id, "skipped": True, "reason": "p01_owned"}
     log = _log_start("validate_rewrite", {"article_id": article_id})
     article = NewsArticle.objects.get(pk=article_id)
     try:
@@ -3061,11 +3089,18 @@ def qq_push_delivery_task(self, delivery_id: int) -> dict:
 
 
 def publish_article(article: NewsArticle, user) -> None:
+    from stable.services.news_pipeline import is_pipeline_article
+    if is_pipeline_article(article):
+        from stable.services.news_pipeline import publish_news_web
+        article.refresh_from_db(fields=["active_news_run"])
+        publish_news_web(article.active_news_run_id)
+        return
     article.workflow_status = WorkflowStatus.PUBLISHED
     article.published_to_web_at = timezone.now()
     article.published_by = user
     article.published_by_mode = PublishedByMode.MANUAL
-    article.save(update_fields=["workflow_status", "published_to_web_at", "published_by", "published_by_mode", "updated_at"])
+    from stable.services.news_feed import save_legacy_publication
+    save_legacy_publication(article, update_fields=["workflow_status", "published_to_web_at", "published_by", "published_by_mode", "updated_at"])
     from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
 
     enqueue_qq_auto_push_for_article(article.id)
@@ -3380,3 +3415,30 @@ def advance_race_event_lifecycle_task(
         "error": result.error,
         "transition_id": result.transition_id,
     }
+
+
+# HTTP上限120秒；核账预留30秒，硬超时及180秒lease再各留15秒。
+@shared_task(soft_time_limit=150, time_limit=165)
+def process_news_quality_run_task(run_id):
+    from stable.services.news_pipeline import process_news_run, enqueue_news_run
+    from stable.models import NewsProcessingRun
+    outcome = process_news_run(run_id)
+    run = NewsProcessingRun.objects.get(pk=run_id)
+    if run.state in {"pending", "ready"} and run.next_attempt_at <= timezone.now():
+        enqueue_news_run(run_id)
+    return outcome
+
+
+@shared_task
+def scan_news_quality_runs_task():
+    from stable.services.news_pipeline import scan_news_runs
+    return scan_news_runs()
+
+
+@shared_task
+def build_news_quality_feed_task():
+    if not getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        return {"enabled": False}
+    from stable.services.news_feed import create_snapshot
+    snapshot = create_snapshot(with_features=True)
+    return {"generation": str(snapshot.generation), "watermark": snapshot.catalog_watermark}

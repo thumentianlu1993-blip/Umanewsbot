@@ -1,0 +1,9 @@
+{% extends "stable/console/base.html" %}
+{% block title %}新闻全文修订{% endblock %}
+{% block content %}
+<div class="page-header"><div><h2>新闻全文修订</h2><p>保存后会审校这一版完整文字。已公开稿件保持原文，重大更新或实质更正以新稿发布。</p></div><a href="{% url 'console-news-quality-detail' run.pk %}">审核记录与公开稿</a></div>
+<div class="grid-2">
+<section class="panel"><h3>{{ run.source_snapshot.title }}</h3><p><a href="{{ run.source_snapshot.url }}" rel="noreferrer" target="_blank">查看来源</a></p><div class="content-block">{{ run.source_snapshot.body|linebreaksbr }}</div></section>
+<section class="panel"><form method="post">{% csrf_token %}{{ form.as_p }}<button name="intent" value="submit_review">保存并提交审校</button></form></section>
+</div>
+{% endblock %}

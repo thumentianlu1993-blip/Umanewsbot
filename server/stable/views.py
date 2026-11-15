@@ -1975,6 +1975,8 @@ def candidate_detail(request: HttpRequest, article_id: int):
         ),
         pk=article_id,
     )
+    if article.active_news_run_id:
+        return redirect("console-news-quality-detail", run_id=article.active_news_run_id)
     return render(
         request,
         "stable/console/candidate_detail.html",
@@ -2221,6 +2223,13 @@ def candidate_ignore(request: HttpRequest, article_id: int):
     if denied:
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
+    if article.active_news_run_id:
+        from stable.services.news_review import review_action, ReviewConflict
+        try:
+            run = review_action(article.active_news_run_id, action="reject", user=request.user, reason="管理员reject当前候选")
+        except ReviewConflict as error:
+            return HttpResponse(str(error), status=409)
+        return redirect("console-news-quality-detail", run_id=run.pk)
     article.workflow_status = WorkflowStatus.IGNORED
     article.review_mode = ReviewMode.IGNORED
     article.automation_status = AutomationStatus.IGNORED
@@ -2244,6 +2253,13 @@ def candidate_mark_manual(request: HttpRequest, article_id: int):
     if denied:
         return denied
     article = get_object_or_404(NewsArticle, pk=article_id)
+    if article.active_news_run_id:
+        from stable.services.news_review import review_action, ReviewConflict
+        try:
+            run = review_action(article.active_news_run_id, action="hold", user=request.user, reason="管理员hold当前候选")
+        except ReviewConflict as error:
+            return HttpResponse(str(error), status=409)
+        return redirect("console-news-quality-detail", run_id=run.pk)
     article.review_mode = ReviewMode.MANUAL
     article.automation_status = AutomationStatus.MANUAL_REVIEW_REQUIRED
     article.workflow_status = WorkflowStatus.PENDING_REVIEW
@@ -2294,10 +2310,23 @@ def article_editor(request: HttpRequest, article_id: int):
         slot="homepage_primary", status="active"
     ).first()
     can_manage_headline = request.user.has_perm("stable.change_homepageheadlineselection")
+    if article.active_news_run_id:
+        from stable.news_quality_views import edit_revision
+        return edit_revision(request, article)
     article.ensure_editable_fields()
     if request.method == "POST":
         form = ArticleEditorForm(request.POST, instance=article)
         if form.is_valid():
+            from stable.services.news_pipeline import is_pipeline_article, submit_manual_target
+            if is_pipeline_article(article):
+                intent = request.POST.get("intent", "save")
+                if intent in {"save", "autosave", "submit_review", "publish"}:
+                    run = submit_manual_target(article, form.cleaned_data, editor=request.user)
+                    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                        return JsonResponse({"saved": True, "run_id": run.pk, "workflow_status": "pending_review"})
+                    messages.success(request, "修订已保存为待审稿；通过审校与事实增量检查后独立发布。")
+                    return redirect("console-article-editor", article_id=article.pk)
+                return JsonResponse({"detail": "请从具体稿件的审核记录执行此操作"}, status=400)
             article = form.save(commit=False)
             article.mark_manual_edits(["title_zh", "summary_zh", "body_zh", "source_note", "editor_notes", "tags_json"])
             intent = request.POST.get("intent", "save")
@@ -2332,7 +2361,11 @@ def article_editor(request: HttpRequest, article_id: int):
             else:
                 if article.workflow_status in {WorkflowStatus.PENDING_TRANSLATION, WorkflowStatus.TRANSLATION_FAILED}:
                     article.workflow_status = WorkflowStatus.PENDING_EDIT
-            article.save()
+            if intent == "publish":
+                from stable.services.news_feed import save_legacy_publication
+                save_legacy_publication(article)
+            else:
+                article.save()
             form.save_related_regions(article)
             if intent == "publish":
                 from stable.services.qq_auto_push import enqueue_qq_auto_push_for_article
@@ -2407,6 +2440,11 @@ def headline_control(request: HttpRequest):
             if len(eligible_articles) >= 48:
                 break
 
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.editorial_headlines import headline_entry_candidates
+        from stable.services.news_public_read import display_article
+        entries, _ = headline_entry_candidates()
+        eligible_articles = [display_article(row) for row in entries]
     active_rec = state.get("active_recommendation")
     recommendation = None
     if active_rec:
@@ -2458,7 +2496,7 @@ def headline_select(request: HttpRequest):
     article_id = form.cleaned_data["article_id"]
     expected_version = form.cleaned_data["expected_version"]
     try:
-        result = set_manual_headline(article_id, user=request.user, expected_version=expected_version)
+        result = set_manual_headline(article_id, user=request.user, expected_version=expected_version, receipt_id=request.POST.get("receipt_id") or None)
         if result.get("success"):
             messages.success(request, "已设置首页头条。")
         else:
@@ -2856,6 +2894,9 @@ def _horse_record_position(record: HorseRaceRecord) -> str:
 def _public_horse_article_entries(profile: HorseProfile, *, limit: int = 12) -> list[dict]:
     descendant_ids = get_descendant_horse_ids(profile, depth=2, public_only=True)
     horse_ids = {profile.pk, *descendant_ids}
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.news_public_read import related_horse_entries
+        return related_horse_entries(horse_ids, primary_id=profile.pk, limit=limit)
     links = list(
         ArticleHorseLink.objects.filter(
             horse_profile_id__in=horse_ids,
@@ -4057,6 +4098,9 @@ def public_race_detail(request: HttpRequest, year: int, slug: str):
             ArticleRaceLinkType.RELATED,
         )
     }
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.news_public_read import related_race_articles
+        news_groups = related_race_articles(event.pk)
     from .services.race_pre_race import public_jra_preview, public_reviewed_preview
     from .services.nar_pre_race import public_nar_preview
     from .services.uk_pre_race import public_uk_preview
@@ -4175,6 +4219,9 @@ def public_race_sitemap_shard(request: HttpRequest, shard: int):
 
 
 def public_news_feed(request: HttpRequest):
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.news_public_views import feed
+        return feed(request)
     _public_apply_list_nav(request, "news")
     redirect_response = _redirect_legacy_region(request)
     if redirect_response:
@@ -4243,6 +4290,17 @@ def public_news_feed(request: HttpRequest):
 
 
 def public_article_detail(request: HttpRequest, article_id: int):
+    from stable.models import NewsPublicationReceipt
+    first_receipt = NewsPublicationReceipt.objects.filter(article_id=article_id).order_by("published_at", "id").first()
+    if first_receipt:
+        from stable.news_public_views import receipt_detail
+        return receipt_detail(request, first_receipt.pk)
+    if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+        from stable.services.news_feed import visible_entries
+        from stable.news_public_views import entry_detail
+        entry = visible_entries().filter(article_id=article_id, kind="legacy").order_by("-feed_seq").first()
+        if entry:
+            return entry_detail(request, entry)
     article = get_object_or_404(
         NewsArticle.objects.prefetch_related(
             "race_links__event",
@@ -4559,22 +4617,33 @@ def public_horse_follows(request: HttpRequest):
         )
         entries = followed_articles(token_hash, limit=40)
         direct_ids = {follow.horse_profile_id for follow in follows}
-        article_ids = [entry["article"].pk for entry in entries]
-        public_articles = {article.pk: article for article in _public_published_articles().filter(pk__in=article_ids)}
-        entries = [
-            {
-                **entry,
-                "article": public_articles[entry["article"].pk],
-                "source_horse_profile": entry["horse_profile"],
-                "is_descendant": entry["horse_profile"].pk not in direct_ids,
-            }
-            for entry in entries
-            if entry["article"].pk in public_articles
-        ]
+        if getattr(settings, "NEWS_QUALITY_FEED_ENABLED", False):
+            entries = [{**entry, "source_horse_profile": entry["horse_profile"],
+                        "is_descendant": entry["horse_profile"].pk not in direct_ids} for entry in entries]
+        else:
+            article_ids = [entry["article"].pk for entry in entries]
+            public_articles = {article.pk: article for article in _public_published_articles().filter(pk__in=article_ids)}
+            entries = [
+                {
+                    **entry,
+                    "article": public_articles[entry["article"].pk],
+                    "source_horse_profile": entry["horse_profile"],
+                    "is_descendant": entry["horse_profile"].pk not in direct_ids,
+                }
+                for entry in entries
+                if entry["article"].pk in public_articles
+            ]
     return render(request, "stable/public/horse_follows.html", {"follows": follows, "followed_entries": entries})
 
 
 def legacy_public_article_detail(request: HttpRequest, slug: str):
+    from stable.models import NewsPublicationReceipt
+    anchor = NewsArticle.objects.filter(public_slug=slug).first()
+    if anchor and NewsPublicationReceipt.objects.filter(article=anchor).exists():
+        first = NewsPublicationReceipt.objects.filter(article=anchor).order_by("published_at", "id").first()
+        if first.visibility != "public":
+            return HttpResponse(status=404, headers={"Cache-Control": "private, no-store"})
+        return redirect(anchor.public_path)
     article = get_object_or_404(
         NewsArticle,
         workflow_status=WorkflowStatus.PUBLISHED,
@@ -4725,6 +4794,12 @@ def article_update_api(request: HttpRequest, article_id: int) -> JsonResponse:
         return JsonResponse({"detail": "forbidden"}, status=403)
     article = get_object_or_404(NewsArticle, pk=article_id)
     payload = json.loads(request.body.decode("utf-8"))
+    from stable.services.news_pipeline import is_pipeline_article, submit_manual_target
+    if is_pipeline_article(article):
+        if set(payload) - {"title_zh", "body_zh", "summary_zh"}:
+            return JsonResponse({"detail": "P01 请使用稿件审核或撤回入口"}, status=400)
+        run = submit_manual_target(article, payload, editor=request.user)
+        return JsonResponse({"updated": True, "run_id": run.pk, "state": run.state, "fields": list(payload)})
     changed_fields: list[str] = []
     for field in ("title_zh", "summary_zh", "body_zh", "push_summary_zh", "editor_notes", "workflow_status", "status"):
         if field in payload:

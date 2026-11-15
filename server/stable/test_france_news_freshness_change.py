@@ -214,10 +214,9 @@ class FranceGalopPublishedEvidenceTests(TestCase):
         adapter = FranceGalopEnglishNewsAdapter()
         detail = adapter.parse_detail_html(
             """
-            <article>
-              <h1>Official update</h1>
-              <time datetime="2026-07-12T15:30:00">12 July 2026</time>
-              <p>Official racing body.</p>
+            <article class="full">
+              <header><h1>Official update</h1><time datetime="2026-07-12T15:30:00">12 July 2026</time></header>
+              <div class="field--name-body"><p>Official racing body.</p></div>
             </article>
             """,
             url="https://www.france-galop.com/en/content/official-update",
@@ -231,8 +230,8 @@ class FranceGalopPublishedEvidenceTests(TestCase):
         adapter = FranceGalopEnglishNewsAdapter()
         detail = adapter.parse_detail_html(
             """
-            <main><h1>Official update</h1><div class="date">12 July 2026 - 15:30</div>
-            <p>Official racing body.</p></main>
+            <article class="full"><header><h1>Official update</h1><div class="authored"><div class="date">12 July 2026 - 15:30</div></div></header>
+            <div class="field--name-body"><p>Official racing body.</p></div></article>
             """,
             url="https://www.france-galop.com/en/content/official-update",
         )
@@ -243,8 +242,8 @@ class FranceGalopPublishedEvidenceTests(TestCase):
         adapter = FranceGalopEnglishNewsAdapter()
         detail = adapter.parse_detail_html(
             """
-            <main><h1>Official update</h1><p class="date">Sunday, July 12, 2026 - 19:04</p>
-            <p>Official racing body.</p></main>
+            <article class="full"><header><h1>Official update</h1><div class="authored"><p class="date">Sunday, July 12, 2026 - 19:04</p></div></header>
+            <div class="field--name-body"><p>Official racing body.</p></div></article>
             """,
             url="https://www.france-galop.com/en/content/official-update",
         )
@@ -256,8 +255,8 @@ class FranceGalopPublishedEvidenceTests(TestCase):
         adapter = FranceGalopEnglishNewsAdapter()
         detail = adapter.parse_detail_html(
             """
-            <article><h1>Winter update</h1><time datetime="2026-01-12T15:30:00">12 January 2026</time>
-            <p>Official racing body.</p></article>
+            <article class="full"><header><h1>Winter update</h1><time datetime="2026-01-12T15:30:00">12 January 2026</time></header>
+            <div class="field--name-body"><p>Official racing body.</p></div></article>
             """,
             url="https://www.france-galop.com/en/content/winter-update",
         )

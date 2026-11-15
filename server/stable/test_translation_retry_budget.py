@@ -703,6 +703,8 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
         self.assertEqual(TranslationRetryBudget.objects.count(), 0, "逆迁移仅针对空账表")
         article = article_for_retry(source_article_id="migration-original-kept")
         tables = {TranslationRetryBudget._meta.db_table, TranslationRequestAttempt._meta.db_table}
+        entry_applied = MigrationRecorder(connection).applied_migrations()
+        entry_leaves = MigrationExecutor(connection).loader.graph.leaf_nodes("stable")
         try:
             MigrationExecutor(connection).migrate([("stable", "0079_multisource_race_enrollment")])
             self.assertFalse(tables & set(connection.introspection.table_names()))
@@ -710,7 +712,8 @@ class TranslationBudgetMigrationBoundaryTests(TransactionTestCase):
                              MigrationRecorder(connection).applied_migrations())
             self.assertTrue(NewsArticle.objects.filter(pk=article.pk).exists())
         finally:
-            MigrationExecutor(connection).migrate([("stable", "0080_translation_retry_budget")])
+            MigrationExecutor(connection).migrate(entry_leaves)
+        self.assertEqual(set(MigrationRecorder(connection).applied_migrations()), set(entry_applied))
         self.assertTrue(tables <= set(connection.introspection.table_names()))
         self.assertTrue(NewsArticle.objects.filter(pk=article.pk).exists())
         self.assertEqual(TranslationRetryBudget.objects.count(), 0)

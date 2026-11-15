@@ -146,12 +146,22 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
             },
         )
         if not created:
+            # 锁住锚点后先路由；已公开稿的源文和公开字段不能被重抓覆盖。
+            article = NewsArticle.objects.select_for_update().get(pk=article.pk)
+            from stable.services.news_pipeline import is_pipeline_article, source_snapshot, start_revision
+            if is_pipeline_article(article):
+                start_revision(article, snapshot=source_snapshot(article, draft))
+                article.refresh_from_db()
+                from stable.services.news_discovery import record_ingested
+                record_ingested(crawl_job, draft, article)
+                return ArticleUpsertResult(article=article, created=False)
             source_elevated = _should_elevate_ranked_source(article, draft)
             if _should_update_primary_source(article, draft, source_elevated=source_elevated):
                 article.source_mode = draft.source_mode
                 article.source_config = source_config or article.source_config
                 article.crawl_job = crawl_job or article.crawl_job
-                if not article.attribution_locked:
+                # 逐稿地区候选交给既有 off/shadow/enforce 与历史稿策略；重抓不能先写入绕过它。
+                if not article.attribution_locked and not draft_metadata.get("region_evidence"):
                     article.racing_region = source_metadata["racing_region"]
                 article.source_language = source_metadata["source_language"]
                 if source_config:
@@ -206,4 +216,10 @@ def upsert_article_from_draft(draft, crawl_job: CrawlJob | None = None) -> Artic
                     image.local_path = ""
             image.save()
         apply_article_attribution(article, source_config=article.source_config, is_new_article=created)
+        from stable.services.news_pipeline import can_enroll, start_revision
+        if created and can_enroll(article):
+            start_revision(article)
+            article.refresh_from_db()
+        from stable.services.news_discovery import record_ingested
+        record_ingested(crawl_job, draft, article)
     return ArticleUpsertResult(article=article, created=created, source_elevated=source_elevated)

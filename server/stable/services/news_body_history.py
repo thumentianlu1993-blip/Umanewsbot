@@ -32,6 +32,8 @@ RECEIPT_SCHEMA_VERSION = 1
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _COHORT_SOURCE_SITE = SourceSite.HORSE_RACING_NATION
+from stable.services.news_content import BODY_SELECTORS
+_COHORT_SOURCE_SITES = frozenset(BODY_SELECTORS)
 _MAX_BATCH_SIZE = 10
 _MAX_INVENTORY_PAGE = 500
 
@@ -140,6 +142,7 @@ ROLLBACK_WRITABLE_FIELDS = (
 )
 
 FINGERPRINT_DRIFT_KEYS = (
+    "source_site", "source_article_id", "source_url", "active_news_run_id", "withdrawn_at",
     "original_content_html",
     "body_ja_raw",
     "body_ja_normalized",
@@ -364,6 +367,21 @@ def _parse_with_adapter(article: NewsArticle) -> tuple[str, str, str, str, str]:
     """Returns (parse_status, body_selector, after_body_raw, after_title, after_body_normalized)."""
     if not article.original_content_html:
         return ("missing_original_html", "", "", "", "")
+    if article.active_news_run_id or article.news_receipts.exists():
+        return ("p01_owned", "", "", "", "")
+    if article.source_site not in _COHORT_SOURCE_SITES:
+        return ("unsupported_source", "", "", "", "")
+    if article.source_site != _COHORT_SOURCE_SITE:
+        from stable.services.news_content import clean_source, ContentBlocked
+        from stable.services.news_pipeline import source_snapshot
+        try:
+            cleaned = clean_source(source_snapshot(article))
+        except ContentBlocked:
+            return ("parse_error", "", "", "", "")
+        if cleaned.get("suspicious_block_ids"):
+            return ("ambiguous_template", "", "", "", "")
+        body = "\n\n".join(row["text"] for row in cleaned["blocks"])
+        return ("ok", cleaned["selector"], body, cleaned["title"], body)
     adapter_class = INTERNATIONAL_ADAPTERS.get(article.source_site)
     if adapter_class is None:
         return ("unsupported_source", "", "", "", "")
@@ -387,7 +405,7 @@ def _classify_source_status(
     before_sha: str,
     after_sha: str,
 ) -> str:
-    if parse_status in {"missing_original_html", "selector_not_found", "empty_after_cleaning", "parse_error", "unsupported_source"}:
+    if parse_status != "ok":
         return SOURCE_BLOCKED
     if before_sha != after_sha:
         return SOURCE_CHANGED
@@ -614,6 +632,11 @@ def compute_before_fingerprint(article: NewsArticle) -> dict[str, str]:
     manual_list = list(article.manually_edited_fields or [])
     return {
         "id": str(article.id),
+        "source_site": article.source_site,
+        "source_article_id": article.source_article_id,
+        "source_url": article.source_url,
+        "active_news_run_id": str(article.active_news_run_id or ""),
+        "withdrawn_at": article.withdrawn_at.isoformat() if article.withdrawn_at else "",
         "updated_at": article.updated_at.isoformat(),
         "original_content_html": _sha256(article.original_content_html),
         "body_ja_raw": _sha256(article.body_ja_raw),
@@ -653,6 +676,11 @@ def validate_approved_decisions(
     - The decision's candidate_sha256 must match the candidate entry's hash
     """
     errors: list[str] = []
+    sites = approved.get("source_sites", [_COHORT_SOURCE_SITE])
+    if type(sites) is not list or not sites or len(sites) != len(set(sites)) or not set(sites) <= _COHORT_SOURCE_SITES:
+        errors.append("source_sites 来源白名单无效")
+    if candidate_manifest is not None and set(sites) != set(candidate_manifest.get("source_sites", [_COHORT_SOURCE_SITE])):
+        errors.append("source_sites 与 candidate manifest 不匹配")
 
     if approved.get("schema_version") != APPROVED_MANIFEST_SCHEMA_VERSION:
         errors.append(f"schema_version 必须为 {APPROVED_MANIFEST_SCHEMA_VERSION}")
@@ -708,6 +736,8 @@ def validate_approved_decisions(
                     if field not in ALLOWED_APPROVE_FIELDS:
                         errors.append(f"article_id={article_id} approved_field 不在 allowlist: {field}")
 
+                if {"body_zh", "translated_body_zh"} & set(approved_fields) and before_fp.get("rewrite_body_zh") not in {None, _sha256("")} and "rewrite_body_zh" not in approved_fields:
+                    errors.append(f"article_id={article_id} 必须同步清除或审核 rewrite_body_zh，避免遮盖全文")
                 # --- FIELD_DEPENDENCIES ---
                 approved_set = frozenset(approved_fields)
                 for field in approved_fields:
@@ -873,6 +903,17 @@ def apply_batch_inside_transaction(
         missing = set(article_ids) - {a.id for a in articles}
         raise ValueError(f"文章不存在: {sorted(missing)}")
 
+    # 来源清单是 manifest 的一部分；旧清单缺该键时仅保留原 HRN 范围。
+    sites = approved_manifest.get("source_sites", [_COHORT_SOURCE_SITE])
+    if type(sites) is not list or not sites or not set(sites) <= _COHORT_SOURCE_SITES or len(decisions) > _MAX_BATCH_SIZE:
+        raise ValueError("来源 source_sites 或批次范围无效")
+    for article in articles:
+        if article.source_site not in sites:
+            raise ValueError(f"来源 source_site 不在清单内: article_id={article.pk}")
+        if article.active_news_run_id or article.news_receipts.exists():
+            raise ValueError(f"P01 稿件不能通过历史工具原位修改: article_id={article.pk}")
+        if article.withdrawn_at or article.workflow_status == WorkflowStatus.WITHDRAWN:
+            raise ValueError(f"已撤回稿件不能执行历史修复: article_id={article.pk}")
     # --- drift check ---
     errors: list[str] = []
     for article in articles:
@@ -1109,6 +1150,8 @@ def rollback_batch(
         raise ValueError(f"rollback manifest schema_version 必须为 {ROLLBACK_MANIFEST_SCHEMA_VERSION}")
 
     entries = manifest.get("entries", [])
+    if not isinstance(entries, list) or not 1 <= len(entries) <= _MAX_BATCH_SIZE:
+        raise ValueError("历史恢复范围必须为1..10篇")
     article_ids = sorted([e["article_id"] for e in entries])
 
     # Load receipt for CAS fingerprints; validate its SHA and cross-reference
