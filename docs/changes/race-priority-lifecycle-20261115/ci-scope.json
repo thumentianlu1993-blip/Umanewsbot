@@ -104,7 +104,7 @@
       "path": "docs/changes/race-priority-lifecycle-20261115/rollout.md",
       "status": "added",
       "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "d837401c9e5a4c70935b9a80813d1e7ea82e07c01c403b48753fe6867cd7780d",
+      "after_hash": "667ef5b337bf882cf2d7af924a4ec8d36168945acac1dd7580fb06b1730180dd",
       "before_mode": null,
       "after_mode": "100644"
     },
@@ -146,14 +146,6 @@
       "before_hash": "c19129f582d944df4f7f2b976271a4c5baa27a29a028d9fbb46efba0b0b0b8c5",
       "after_hash": "1cbc5364e91369d274731cb269048f2255a6544f266bf0787b145bdabde4d939",
       "before_mode": "100644",
-      "after_mode": "100644"
-    },
-    {
-      "path": "runtime/snapshots/567bb4c72f1e4139916ff550b97efdaea517acbfc4bab3e94dcdcc8152f8d8de-5b161d3dded84351677e69dc964d295c58f6f9986684e9165c397975c0400266.json",
-      "status": "added",
-      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "after_hash": "5b161d3dded84351677e69dc964d295c58f6f9986684e9165c397975c0400266",
-      "before_mode": null,
       "after_mode": "100644"
     },
     {

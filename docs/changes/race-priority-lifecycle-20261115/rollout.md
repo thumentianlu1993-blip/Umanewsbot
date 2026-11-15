@@ -7,7 +7,7 @@
 `633f80ce4ffc4a5ee0361bbef7bf6805f6ab313c` 同树。部署目录 HEAD 已是另一个日历线程的
 `bef0cdc5034bd2516df9876b2a7dde2357f03495`，不能 checkout 或覆盖该目录来发布本包。
 
-四应用运行且 Web healthy。只读快照：MemAvailable 约 4.8 GiB、Swap 未使用、根分区可用约
+生产 migration recorder 最新为 `0088_p01_sealed_evidence`。四应用运行且 Web healthy。只读快照：MemAvailable 约 4.8 GiB、Swap 未使用、根分区可用约
 6.2 GiB。新 worker 合计内存上限 768 MiB；磁盘余量须满足实际构建及现行发布门槛，不能以此快照宣称发布可执行。
 现有 Compose 是固定发布目录及后续英法美/新闻/名称等完整覆盖链，不能仅运行仓库基础 yml。
 
