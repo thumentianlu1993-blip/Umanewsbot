@@ -1,0 +1,528 @@
+[
+  {
+    "event_id": 145,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "華商會挑戰盃 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 146,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "洋紫荊短途錦標 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 147,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "一月盃 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 148,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "百週年紀念短途盃",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_child"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 149,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "董事盃",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_child"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 150,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "百週年紀念銀瓶 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 151,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "女皇銀禧紀念盃",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_single"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 152,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "花旗銀行香港金盃",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_single"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 153,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "主席錦標",
+    "grade_text": "二級賽",
+    "normalized_grade": "G2",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G2"
+  },
+  {
+    "event_id": 154,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "短途錦標",
+    "grade_text": "二級賽",
+    "normalized_grade": "G2",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G2"
+  },
+  {
+    "event_id": 155,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "主席短途獎",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_child"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 156,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "富衛保險冠軍一哩賽",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_child"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 157,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "富衛保險女皇盃",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_child"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 158,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "皇太后紀念盃 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 159,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "渣打冠軍暨遮打盃",
+    "grade_text": "一級賽",
+    "normalized_grade": "G1",
+    "source_refs": {
+      "primary": "https://campaigns.hkjc.com/racing-event-hub/ch/",
+      "source_kind": "event_hub_g1_single"
+    },
+    "expected": "G1"
+  },
+  {
+    "event_id": 160,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "沙田銀瓶 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 161,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "獅子山錦標 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 162,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "精英盃 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 163,
+    "year": 2026,
+    "country_region": "hong_kong",
+    "original_name": "精英碟 (讓賽)",
+    "grade_text": "三級賽",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://racing.hkjc.com/zh-hk/international-racing/g2-g3-races/index",
+      "source_kind": "g2_g3_table"
+    },
+    "expected": "G3"
+  },
+  {
+    "event_id": 20985,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Wasdell Group Silver Trophy Handicap Hurdle Race (Premier Handicap) (GBB Race)",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 20989,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Bet Boost At Bet365 Crossley Handicap Steeple Chase (Premier Handicap) (GBB Race)",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 20990,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Sodexo Live! Regal Encore Handicap Steeple Chase (Premier Handicap) (GBB Race)",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 20993,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "BetMGM Handicap Steeple Chase (Premier Handicap) (GBB Race)",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 20999,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Paddy PowerGoldCup WilliamHolmanH’CapChase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21000,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Oddschecker Tom Oliver H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21001,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Unibet Greatwood H’Cap Hurdle",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21006,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Betfair Stayers’ Red Rose H’Cap Hurdle",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21002,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Castello Banfi Hurst Park Handicap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21011,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "BetMGM Rehearsal H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21008,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Coral Gold Cup H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21009,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Gerry Feilden Intermediate H’Cap Hurdle",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21014,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "William Hill Half A Mill Becher H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21016,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Tradesmen’s Plate H’Cap Hurdle",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21017,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Turners George Stevens H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21019,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Support The Hunt Family Fund December Gold Cup H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21020,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Ascot Rotary Club Festive H’Cap Hurdle",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21022,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Howden Silver Cup H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21026,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "William Hill Rowland Meyrick H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 21030,
+    "year": 2026,
+    "country_region": "united_kingdom",
+    "original_name": "Coral Welsh Grand National H’Cap Chase",
+    "grade_text": "Premier Handicap",
+    "normalized_grade": "G3",
+    "source_refs": {
+      "primary": "https://media.britishhorseracing.com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_2627.pdf"
+    },
+    "expected": "Premier 让赛"
+  },
+  {
+    "event_id": 19620,
+    "year": 2027,
+    "country_region": "hong_kong",
+    "original_name": "Hong Kong Classic Mile",
+    "grade_text": "4YO",
+    "normalized_grade": "OTHER",
+    "source_refs": {
+      "source_url": "https://racing.hkjc.com/contentAsset/api/getSeasonRaces",
+      "reviewed_import": "import_hkjc_2627"
+    },
+    "expected": "四岁马经典赛"
+  },
+  {
+    "event_id": 19623,
+    "year": 2027,
+    "country_region": "hong_kong",
+    "original_name": "Hong Kong Classic Cup",
+    "grade_text": "4YO",
+    "normalized_grade": "OTHER",
+    "source_refs": {
+      "source_url": "https://racing.hkjc.com/contentAsset/api/getSeasonRaces",
+      "reviewed_import": "import_hkjc_2627"
+    },
+    "expected": "四岁马经典赛"
+  },
+  {
+    "event_id": 19625,
+    "year": 2027,
+    "country_region": "hong_kong",
+    "original_name": "Hong Kong Derby",
+    "grade_text": "4YO",
+    "normalized_grade": "OTHER",
+    "source_refs": {
+      "source_url": "https://racing.hkjc.com/contentAsset/api/getSeasonRaces",
+      "reviewed_import": "import_hkjc_2627"
+    },
+    "expected": "四岁马经典赛"
+  }
+]

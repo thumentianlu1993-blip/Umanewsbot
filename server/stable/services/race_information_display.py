@@ -74,6 +74,29 @@ def _catalog_meter_profile(obj, refs):
     return ''
 
 
+# 仅接纳已核对的官方目录合同；早期香港本地等级不按现代国际等级解释。
+_GRADE_SOURCE_PROFILES = (
+    ('hkjc_group', 'hong_kong', 2017, 'primary', ('g2_g3_table',),
+     r'^https://racing[.]hkjc[.]com/zh-hk/international-racing/g2-g3-races/index$'),
+    ('hkjc_group', 'hong_kong', 2017, 'primary', ('event_hub_g1_child', 'event_hub_g1_single'),
+     r'^https://campaigns[.]hkjc[.]com/racing-event-hub/ch/$'),
+    ('hkjc_4yo', 'hong_kong', 2017, 'source_url', (),
+     r'^https://racing[.]hkjc[.]com/contentAsset/api/getSeasonRaces$'),
+    ('bha_premier_handicap', 'united_kingdom', 2023, 'primary', (),
+     r'^https://media[.]britishhorseracing[.]com/bha/Publications/Pattern_Listed_Books/British_Jump_Pattern_Listed_[0-9]{4}[.]pdf$'),
+)
+
+
+def _grade_source_profile(obj, refs):
+    for profile, region, first_year, key, kinds, pattern in _GRADE_SOURCE_PROFILES:
+        year, url = value(obj, 'year'), refs.get(key)
+        if (value(obj, 'country_region') == region and isinstance(year, int) and year >= first_year
+                and isinstance(url, str) and re.fullmatch(pattern, url)
+                and (not kinds or refs.get('source_kind') in kinds)):
+            return profile
+    return ''
+
+
 def source_context(obj):
     refs = value(obj, 'source_refs', {})
     refs = refs if isinstance(refs, dict) else {}
@@ -101,6 +124,7 @@ def source_context(obj):
         'distance_unit': distance_unit or ('meter' if profile else ''),
         'distance_profile': profile,
         'catalog_profile': catalog_profile,
+        'grade_profile': _grade_source_profile(obj, refs),
         'distance_unit_conflict': conflict,
         'weight_unit': units.get('carried_weight', '') if isinstance(units.get('carried_weight'), str) else '',
         'odds_format': units.get('odds_value', '') if isinstance(units.get('odds_value'), str) else '',
@@ -183,6 +207,16 @@ class PublicGradeCode(Func):
         host = ''.join('[' + c.lower() + c.upper() + ']' if c.isalpha() else ('[.]' if c == '.' else c)
                        for c in 'https://www.jra.go.jp')
         url_pattern = '^' + host + r'(?::(?:0*443)?)?/datafile/seiseki/replay/2026/jyusyo[.]html(?:[?#].*)?$'
+        profile_clauses, profile_params = [], []
+        for profile, region, first_year, key, kinds, pattern in _GRADE_SOURCE_PROFILES:
+            clause = "WHEN region = %s AND edition >= %s AND jsonb_typeof(refs->%s) = 'string' AND refs->>%s ~ %s"
+            profile_params.extend([region, first_year, key, key, pattern])
+            if kinds:
+                clause += " AND refs->>'source_kind' = ANY(%s)"
+                profile_params.append(list(kinds))
+            profile_clauses.append(clause + " THEN %s")
+            profile_params.append(profile)
+        profile_sql = "CASE " + " ".join(profile_clauses) + " ELSE '' END"
         sql = """(SELECT CASE
             WHEN original_text = '' THEN CASE WHEN stored = ANY(%s) THEN stored ELSE '' END
             WHEN char_length(original_text) > 512 THEN ''
@@ -194,14 +228,18 @@ class PublicGradeCode(Func):
                 (CASE parts[2] WHEN 'I' THEN '1' WHEN 'II' THEN '2' WHEN 'III' THEN '3' ELSE parts[2] END)
               WHEN compact IN ('L','LISTED','リステッド','リステッド競走') THEN 'L'
               WHEN compact IN ('OP','OPEN','オープン') THEN 'OP'
+              WHEN grade_profile = 'hkjc_group' AND original_text IN ('一级赛','一級賽') THEN 'G1'
+              WHEN grade_profile = 'hkjc_group' AND original_text IN ('二级赛','二級賽') THEN 'G2'
+              WHEN grade_profile = 'hkjc_group' AND original_text IN ('三级赛','三級賽') THEN 'G3'
+              WHEN grade_profile = 'bha_premier_handicap' AND original_text = 'PREMIER HANDICAP' THEN 'G3'
               ELSE '' END AS parsed_code, original_text, stored
             FROM (SELECT regexp_match(compact, %s) AS parts,
-                         compact, original_text, stored
+                         compact, original_text, stored, grade_profile
               FROM (SELECT regexp_replace(regexp_replace(text, %s, ''), %s, '', 'g') AS compact,
-                           original_text, stored
+                           original_text, stored, grade_profile
                 FROM (SELECT CASE WHEN verified_name <> '' AND right(original_text, char_length(verified_name)+1) = ' ' || verified_name
                           THEN rtrim(left(original_text, char_length(original_text)-char_length(verified_name)-1), %s)
-                          ELSE original_text END AS text, original_text, stored
+                          ELSE original_text END AS text, original_text, stored, grade_profile
                   FROM (SELECT upper(btrim(normalize(coalesce(raw,''), NFKC), %s) COLLATE "und-x-icu") AS original_text,
                                upper(btrim(normalize(coalesce(norm,''), NFKC), %s) COLLATE "und-x-icu") AS stored,
                                CASE WHEN region = 'japan' AND edition = 2026
@@ -209,7 +247,7 @@ class PublicGradeCode(Func):
                                  AND jsonb_typeof(refs->'primary') = 'string'
                                  AND regexp_replace(ltrim(refs->>'primary', %s), E'[\\t\\r\\n]', '', 'g') ~ %s
                                  THEN upper(btrim(normalize(coalesce(name,''), NFKC), %s) COLLATE "und-x-icu")
-                                 ELSE '' END AS verified_name
+                                 ELSE '' END AS verified_name, """ + profile_sql + """ AS grade_profile
                     FROM (SELECT """ + fields + """ ) AS input(raw,norm,name,region,edition,refs)
                   ) AS normalized
                 ) AS suffix_checked
@@ -217,7 +255,7 @@ class PublicGradeCode(Func):
             ) AS matched
           ) AS resolved)"""
         return sql, [list(labels), '^'+_DISPLAY_GRADE_PATTERN+'$', '^重[赏賞]['+whitespace+']*', '['+whitespace+'・.\\-]',
-                     whitespace, whitespace, whitespace, controls, url_pattern, whitespace, *params]
+                     whitespace, whitespace, whitespace, controls, url_pattern, whitespace, *profile_params, *params]
 
 
 def filter_public_grade(queryset, codes):

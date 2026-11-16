@@ -1443,6 +1443,22 @@ def parse_display_grade(raw, *, normalized_grade='', context=None, verified_race
         return _missing(raw, ctx) if not stored else _unresolved(raw, 'unverified_grade', context=ctx)
     if len(text) > 512:
         return _unresolved(raw, 'input_too_long', context=ctx)
+    profile = ctx.get('grade_profile', '')
+    if profile == 'hkjc_4yo' and text == '4YO':
+        if stored not in {'', 'OTHER'}:
+            return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
+        return display_field(raw, '四岁马经典赛', state='preserved', reason='hkjc_classic_series', context=ctx)
+    if profile == 'bha_premier_handicap' and text == 'PREMIER HANDICAP':
+        if stored not in {'', 'G3'}:
+            return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
+        # BHA 保留拍卖目录 G3/黑体地位；公开标签使用现行赛事称谓。
+        return display_field(raw, 'Premier 让赛', code='G3', reason='bha_premier_handicap', context=ctx)
+    chinese_grade = {'一级赛':'G1', '一級賽':'G1', '二级赛':'G2', '二級賽':'G2', '三级赛':'G3', '三級賽':'G3'}
+    if profile == 'hkjc_group' and text in chinese_grade:
+        code = chinese_grade[text]
+        if stored and stored != code:
+            return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
+        return display_field(raw, code, code=code, reason='hkjc_international_group', context=ctx)
     name = _display_text(verified_race_name).upper()
     if name and text.endswith(' ' + name):
         text = text[:-len(name)].rstrip()

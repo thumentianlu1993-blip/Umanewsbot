@@ -186,3 +186,32 @@ class StrictParserTests(SimpleTestCase):
         self.assertIn('14:40',fields['time'].text)
         self.assertEqual(event_fields({'local_date':'not-a-date'})['date'].state,'unknown')
         self.assertEqual(parse_display_distance('1600m',unit_hint=None).state,'unknown')
+
+
+class OfficialGradeMappingTests(SimpleTestCase):
+    def test_live_42_grade_records_display_with_official_context(self):
+        import json
+        from pathlib import Path
+        from stable.services.race_information_display import event_grade_field
+        rows = json.loads((Path(__file__).parent / 'fixtures/race_grade_42_20261116.json').read_text())
+        self.assertEqual(len(rows), 42)
+        for row in rows:
+            with self.subTest(event=row['event_id']):
+                field = event_grade_field(row)
+                self.assertEqual(field.text, row['expected'])
+                self.assertEqual(field.code, '' if row['grade_text'] == '4YO' else row['normalized_grade'])
+
+    def test_contextual_grades_reject_wrong_source_year_and_conflicting_stored_grade(self):
+        from stable.services.race_information_display import event_grade_field
+        base = dict(country_region='hong_kong', year=2026, grade_text='一級賽', normalized_grade='G1',
+                    source_refs={'source_kind':'event_hub_g1_child','primary':'https://campaigns.hkjc.com/racing-event-hub/ch/'})
+        self.assertEqual(event_grade_field(base).text, 'G1')
+        for changed in [dict(source_refs={}),dict(year=2010),dict(country_region='japan'),
+                        dict(normalized_grade='G2'),dict(grade_text='香港一級賽'),
+                        dict(source_refs={'source_kind':'event_hub_g1_child','primary':'https://campaigns.hkjc.com.evil.test/racing-event-hub/ch/'})]:
+            with self.subTest(changed=changed):
+                self.assertIn(event_grade_field({**base, **changed}).state, {'unknown','conflict'})
+        series = dict(country_region='hong_kong',year=2027,grade_text='4YO',normalized_grade='OTHER',
+                      source_refs={'source_url':'https://racing.hkjc.com/contentAsset/api/getSeasonRaces'})
+        self.assertEqual(event_grade_field(series).text, '四岁马经典赛')
+        self.assertEqual(event_grade_field({**series,'normalized_grade':'G1'}).state, 'conflict')

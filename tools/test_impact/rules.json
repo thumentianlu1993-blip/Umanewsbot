@@ -34,7 +34,8 @@
     "docs/changes/p01-main-integration-20261114/ci-scope.json",
     "docs/changes/race-priority-lifecycle-20261115/ci-scope.json",
     "docs/changes/public-time-query-performance/ci-scope.json",
-    "docs/changes/france-identity-seed/ci-scope.json"
+    "docs/changes/france-identity-seed/ci-scope.json",
+    "docs/changes/race-grades-2025-gaps/ci-scope.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -1898,6 +1899,15 @@
     ],
     "server/stable/services/race_priority.py": [
       "race_priority_lifecycle"
+    ],
+    "server/stable/services/historical_target_reconciliation.py": [
+      "race_grade_history"
+    ],
+    "server/stable/management/commands/reconcile_historical_targets.py": [
+      "race_grade_history"
+    ],
+    "server/stable/fixtures/race_grade_42_20261116.json": [
+      "five_region_race_governance"
     ]
   },
   "symbols": {
@@ -2146,6 +2156,7 @@
     "docs/changes/p04-1-race-name-matching/ci-scope.json",
     "docs/changes/race-priority-lifecycle-20261115/ci-scope.json",
     "docs/changes/public-time-query-performance/ci-scope.json",
-    "docs/changes/france-identity-seed/ci-scope.json"
+    "docs/changes/france-identity-seed/ci-scope.json",
+    "docs/changes/race-grades-2025-gaps/ci-scope.json"
   ]
 }

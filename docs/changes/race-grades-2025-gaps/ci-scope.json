@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "base_sha": "c3e4c9ad5b4134fc9bc0156fd4fa2e9f1e17fa0e",
+  "reason": "本包仅扩展可信来源等级展示与SQL筛选，并新增最多11项2025英美目录SHA清单修复工具；覆盖五地区公开页、字段归一、历史目标模型与完整性、精确写入/回滚、核心与选测基础设施，不改变采集调度或迁移。",
+  "domains": [
+    "five_region_race_governance",
+    "race_grade_history",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/race-grades-2025-gaps/audit.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0cd86b29c300d9fe28ad0fbbde4fec8003d4a00f7724412af143684414039e1f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-grades-2025-gaps/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e286cd2c240cdcb217bdef956eb09bfd43d60b27170b31243c3b497694b91dbc",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-grades-2025-gaps/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "6341ff22eb631b1df03aee3453434b71fe6008f415ec11d609e0fcd92599975d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-grades-2025-gaps/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3e417043046f602bb8b21cc3dd7d123923ea930297efadd50aacccff6839511f",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-grades-2025-gaps/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "231347ec19f64aa1214785b2932a01b33c32b094a049988e84ea62ec146e9111",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "d748b83b802f830022311f31f7513720f3c4247a52c5de1e7e0292ece4f7614a",
+      "after_hash": "75331c48fc890b2df075efd91a2b4420a102618e8bd58be931fc9fcb44e4d12c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/fixtures/race_grade_42_20261116.json",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "f98a7ef772515492d8e2ee9569908480768ce436906e38d3110e76e760fdd7c1",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/reconcile_historical_targets.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e9a76325803988fd3bcfeee060e5ddcec98aac06fa9500d8f356c57a54b8f02e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/historical_target_reconciliation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "81253c163bbba7c1e12bc223591cbf01cde61f3fa37f5489d43e345ffd456321",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_field_normalization.py",
+      "status": "modified",
+      "before_hash": "afe1c4c7dba95744e5afcba3c4d19b42818eb989b1cffc6bc98b68ea843a7875",
+      "after_hash": "e61b585cb27e609bdc1fcb88c723b9e9bfb14b43fccf6237ec8a64674dbd3d44",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_information_display.py",
+      "status": "modified",
+      "before_hash": "febfcf66b4d261fe73f9f072d58428e2a6836716abaec1e01ed241984cbf34fd",
+      "after_hash": "725a21236b3143eb63d26671b4e63b51060ff0860d3efa5dcbdbe4d750e9b97b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_historical_target_reconciliation.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2a3b8fb66edf0d28195182345f89dde72e5124371a1abfe41ddd1ffcc1756ba0",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_information_display.py",
+      "status": "modified",
+      "before_hash": "e57ef1a1bc6c4a2053f0a74236ee7c18a66fe97b5a69b766ea1e3bc1c1d113a0",
+      "after_hash": "c12cb08bd388e774d35491735a0d5706ac6a6b0492faf4e3401decff8857b173",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_information_display_pages.py",
+      "status": "modified",
+      "before_hash": "ef1e3f0a2ffbefc07fce09ca9fdb6bb47d28864177160ced70a14f4400f10918",
+      "after_hash": "2fb9dd41f9c20af6fb1fb0ece7ce177261f4fadab7362fde119a977ab4720a12",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "a5210553bd91912f9c75ff3e9b2d186174cca438c45c24cd7c5e4fb125342d59",
+      "after_hash": "8740853e03aa0ac45f8bda6224c5bd4cb154dc67210fc292298611ada7fa5e87",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "fbc72668d33bd5325ed610f8d9151d6fa25b031098b4e8f9597e1874c5290871",
+      "after_hash": "bec7369f6e7ca5f6040667e8fa46c0e863bcb56cb53c533f296a0842f61d1103",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}
