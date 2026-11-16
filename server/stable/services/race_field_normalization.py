@@ -1466,6 +1466,11 @@ def parse_display_grade(raw, *, normalized_grade='', context=None, verified_race
         if stored in _DISPLAY_GRADE_LABELS:
             return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
         return display_field(raw, '—', state='preserved', reason='race_class_not_grade', context=ctx)
+    if text == 'NON-LISTED BLACK-TYPE':
+        # 非表列黑体赛没有 Group/Listed 等级，不用黑体资格推导 L。
+        if stored:
+            return _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
+        return display_field(raw, '黑体赛（非表列）', context=ctx)
     if text in {'无分级', 'UN GRADED', 'UNGRADED'}:
         return display_field(raw, '无分级', context=ctx) if not stored else _unresolved(raw, 'grade_conflict', context=ctx, conflict=True)
     text = re.sub(r'^(?:重赏|重賞)\s*', '', text)
@@ -1516,6 +1521,12 @@ def parse_display_weight(raw, *, unit_hint=''):
     text = _display_text(raw).lower()
     if not text:
         return _missing(raw)
+    if unit_hint == 'stone_lb':
+        # 仅显式来源单位允许把 Sporting Life 的英石-磅换算为磅。
+        stone = re.fullmatch(r'(\d{1,2})-(\d{1,2})', text)
+        if not stone or int(stone[2]) >= 14:
+            return _unresolved(raw, 'weight_unit_unknown', context={'unit': unit_hint})
+        text = str(int(stone[1]) * 14 + int(stone[2])) + 'lb'
     if re.fullmatch(r'\d+(?:\.\d+)?', text) and unit_hint in {'kg', 'lb'}:
         text += unit_hint
     match = re.fullmatch(r'(\d{1,3}(?:\.\d+)?)\s*(kg|千克|公斤|lb|lbs|磅)', text)

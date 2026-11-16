@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "base_sha": "f7888b61e9610926e0fea0e5e26807d14f77226e",
+  "reason": "仅补非表列黑体赛标签和显式英石磅单位解析；覆盖字段归一、公开页、SQL等级筛选与历史目录约束，包含核心和选测规则合同，不改变采集调度、数据库模型或迁移。",
+  "domains": [
+    "five_region_race_governance",
+    "race_grade_history",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/tokyo-turf-display/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "dcc0ac7d315fee1cec8bb5c1182562308fa2be7755a26d3b479f2f1ebb3e1d96",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "75331c48fc890b2df075efd91a2b4420a102618e8bd58be931fc9fcb44e4d12c",
+      "after_hash": "0049f991ec89467611d3eaf8f9c775c68e923b646ef376cfc71b03b90bd38254",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_field_normalization.py",
+      "status": "modified",
+      "before_hash": "e61b585cb27e609bdc1fcb88c723b9e9bfb14b43fccf6237ec8a64674dbd3d44",
+      "after_hash": "8173333fb3212ed8412ca0ac126bf3cdd3bb68b59e6f0e07bfd734e21d5f469c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_information_display.py",
+      "status": "modified",
+      "before_hash": "c12cb08bd388e774d35491735a0d5706ac6a6b0492faf4e3401decff8857b173",
+      "after_hash": "bdbe73695433625acc40dabe4dffbc8fc1532823eaa44a6bc012d530cd349782",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_information_display_pages.py",
+      "status": "modified",
+      "before_hash": "2fb9dd41f9c20af6fb1fb0ece7ce177261f4fadab7362fde119a977ab4720a12",
+      "after_hash": "624240907f43c74847d68cfad2bc6a1ef43ce5f2b7fb0b94cca7da6bc85ec04c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "bec7369f6e7ca5f6040667e8fa46c0e863bcb56cb53c533f296a0842f61d1103",
+      "after_hash": "cca0036f47db6387c90e9d0a0bc0ab5ee7faeed97af44cce72bed61d31d4b904",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

@@ -215,3 +215,37 @@ class OfficialGradeMappingTests(SimpleTestCase):
                       source_refs={'source_url':'https://racing.hkjc.com/contentAsset/api/getSeasonRaces'})
         self.assertEqual(event_grade_field(series).text, '四岁马经典赛')
         self.assertEqual(event_grade_field({**series,'normalized_grade':'G1'}).state, 'conflict')
+
+
+class TokyoNonListedDisplayTests(SimpleTestCase):
+    def test_explicit_non_listed_black_type_is_not_group_or_listed(self):
+        from stable.services.race_field_normalization import parse_display_grade
+        field = parse_display_grade('Non-Listed Black-Type')
+        self.assertEqual(field.text, '黑体赛（非表列）')
+        self.assertEqual(field.code, '')
+        for stored in ('G3', 'L'):
+            self.assertEqual(parse_display_grade('Non-Listed Black-Type', normalized_grade=stored).state, 'conflict')
+        self.assertEqual(parse_display_grade('Black-Type').state, 'unknown')
+
+    def test_stone_pounds_needs_explicit_source_unit_and_valid_pounds(self):
+        from stable.services.race_field_normalization import parse_display_weight
+        field = parse_display_weight('8-6', unit_hint='stone_lb')
+        self.assertEqual(field.text, '118磅（约53.5千克）')
+        self.assertEqual(parse_display_weight('8-6').state, 'unknown')
+        for raw in ('8-14', '-8-6', '8-6 unknown'):
+            self.assertEqual(parse_display_weight(raw, unit_hint='stone_lb').state, 'unknown')
+
+    def test_tokyo_source_metadata_resolves_existing_distance_weight_and_odds(self):
+        from stable.services.race_information_display import event_fields, row_fields
+        event = dict(country_region='united_states', year=2025, grade_text='Non-Listed Black-Type',
+                     normalized_grade='', distance_text='1m', status='finished',
+                     source_refs={'field_units': {'distance_text': 'mile'}})
+        fields = event_fields(event)
+        self.assertEqual(fields['distance'].text, '1英里（约1609米）')
+        self.assertEqual(fields['grade'].text, '黑体赛（非表列）')
+        row = dict(carried_weight='8-6', odds_value='4/6', running_status='finished',
+                   source_refs={'field_units': {'carried_weight': 'stone_lb', 'odds_value': 'fractional'}})
+        fields = row_fields(row)
+        self.assertEqual(fields['weight'].text, '118磅（约53.5千克）')
+        self.assertEqual(fields['odds'].text, '4/6（分数）')
+        self.assertEqual(fields['status'].text, '完赛')

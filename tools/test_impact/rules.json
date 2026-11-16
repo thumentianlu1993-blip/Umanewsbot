@@ -35,7 +35,8 @@
     "docs/changes/race-priority-lifecycle-20261115/ci-scope.json",
     "docs/changes/public-time-query-performance/ci-scope.json",
     "docs/changes/france-identity-seed/ci-scope.json",
-    "docs/changes/race-grades-2025-gaps/ci-scope.json"
+    "docs/changes/race-grades-2025-gaps/ci-scope.json",
+    "docs/changes/tokyo-turf-display/ci-scope.json"
   ],
   "high_risk": [
     ".codex/agents/application.toml",
@@ -2157,6 +2158,7 @@
     "docs/changes/race-priority-lifecycle-20261115/ci-scope.json",
     "docs/changes/public-time-query-performance/ci-scope.json",
     "docs/changes/france-identity-seed/ci-scope.json",
-    "docs/changes/race-grades-2025-gaps/ci-scope.json"
+    "docs/changes/race-grades-2025-gaps/ci-scope.json",
+    "docs/changes/tokyo-turf-display/ci-scope.json"
   ]
 }

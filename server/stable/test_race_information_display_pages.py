@@ -380,6 +380,9 @@ class PublicGradeFilterParityTests(TestCase):
             dict(country_region='france', year=2025, grade_text='G1'+' '*120, normalized_grade=''),
             dict(country_region='france', year=2025, grade_text='ﷺ'*40+'G1', normalized_grade=''),
         ])
+        inputs.extend(dict(country_region='united_states', year=2025,
+                           grade_text='Non-Listed Black-Type', normalized_grade=stored)
+                      for stored in ('', 'G3', 'L'))
         refs = {'source_kind':'jra_official_graded_race_list',
                 'primary':'https://www.jra.go.jp/datafile/seiseki/replay/2026/jyusyo.html'}
         for url in (refs['primary'], 'HTTPS://WWW.JRA.GO.JP/datafile/seiseki/replay/2026/jyusyo.html',
