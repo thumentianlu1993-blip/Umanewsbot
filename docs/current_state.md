@@ -1,6 +1,6 @@
-## 2026-11-15 公开时间 SQL 性能修复已完成实现与本地验收
+## 2026-11-15 公开时间 SQL 性能修复已合并并发布
 
-独立分支 `codex/public-time-query-performance` 基于主线 `67a97939`，为公开时间 SELECT 定点增加单次物化时区名称目录；不改变时间/公开/分页合同，不缓存赛事。真实 PostgreSQL RED 为15次目录函数扫描，优化后投影/相关子查询/union均仅一次。候选 `278dc38b` 的370项固定树隔离范围测试全部通过、零跳过，独立只读review未发现需修正项。[Draft PR #321](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/321) 已建立，最终远端检查以当前head为准。尚未合并或发布；生产只读快照仍运行 `f19c7f2d`，发布依赖PR #320完成上线并冻结新基线，不能混入未上线变更。字体及Nginx/robots保持。见[验证记录](changes/public-time-query-performance/validation.md)和[交付依赖](changes/public-time-query-performance/rollout.md)。
+PR [#321](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/321) 合并为 `2b01cab4`，北京时间20:28:01仅Web发布候选 `29f736b5`，镜像 `ccf91e7dc06d`；其余五应用仍为 `3f298404`，容器及运行状态未变。370项测试、最终CI、独立代码与发布执行器复审通过。最终生产同事务9行结果完全一致，时区目录计划节点15→1，单次SELECT 0.686→0.063秒；源站与本机公网四路径均200，Web healthy，锁已释放。首轮因验收误判既有停止的OneBot而自动回滚，技术修正复审后同包重试成功。无迁移、业务数据或开关调整，字体及Nginx/robots配置保持。见[完整发布证据与维护链](changes/public-time-query-performance/release_evidence.md)。
 
 ## 2026-11-15 P04-1 赛事名称开始正式交付准备
 
