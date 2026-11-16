@@ -397,6 +397,11 @@ class PublicGradeFilterParityTests(TestCase):
             inputs.append(dict(country_region='japan', year=2026, grade_text='GIII STRASSE',
                                normalized_grade='', original_name='Straße',
                                source_refs={**refs, 'primary':url}))
+        live_cases = json.loads((Path(__file__).parent / 'fixtures/race_grade_42_20261116.json').read_text())
+        inputs.extend(live_cases)
+        for row in live_cases:
+            inputs.extend([{**row, 'source_refs': {}}, {**row, 'year': 2010},
+                           {**row, 'normalized_grade': 'G2' if row['normalized_grade'] != 'G2' else 'G1'}])
         events = []
         for index, payload in enumerate(inputs):
             event = RaceEvent.objects.create(slug=f'grade-parity-{index}',

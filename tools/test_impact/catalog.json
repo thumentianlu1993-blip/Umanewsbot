@@ -1082,6 +1082,15 @@
       "stable.test_hkjc_automation",
       "stable.test_us_release",
       "stable.test_pre_race_refresh"
+    ],
+    "race_grade_history": [
+      "stable.test_historical_target_reconciliation",
+      "stable.tests.test_race_field_normalization",
+      "stable.test_historical_race_inventory_models",
+      "stable.test_historical_race_calendar_integrity"
+    ],
+    "module:stable.test_historical_target_reconciliation": [
+      "stable.test_historical_target_reconciliation"
     ]
   },
   "dependencies": {
@@ -3391,6 +3400,12 @@
       "domains": [
         "race_priority_lifecycle"
       ]
+    },
+    "server/stable/test_historical_target_reconciliation.py": {
+      "label": "stable.test_historical_target_reconciliation",
+      "domains": [
+        "module:stable.test_historical_target_reconciliation"
+      ]
     }
   },
   "profiles": {
@@ -3761,7 +3776,8 @@
     "stable.test_p01_news_workflow": "django",
     "stable.test_p01_main_integration": "django",
     "stable.test_hkjc_name_catalog": "django",
-    "stable.test_race_priority_lifecycle": "django"
+    "stable.test_race_priority_lifecycle": "django",
+    "stable.test_historical_target_reconciliation": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
@@ -3852,7 +3868,8 @@
     "uk_race_automation": "integration: 英国付费采集、赛前阶段、完整赛果及发布恢复",
     "five_region_race_governance": "application/integration: 五地区公开过滤、历史字段修复与来源边界",
     "news_quality": "application/integration: P01 全文审校、精确稿件、预算、审核队列与五地区观测",
-    "race_priority_lifecycle": "application/integration/operations: 赛事控制与取数资源隔离、冠军驱动完赛、预算及发布恢复"
+    "race_priority_lifecycle": "application/integration/operations: 赛事控制与取数资源隔离、冠军驱动完赛、预算及发布恢复",
+    "race_grade_history": "integration: 等级投影与历史年度目录精确修复"
   },
   "dedicated_batch_modules": [
     "stable.test_migration_history_repair_postgres",
