@@ -577,6 +577,8 @@ def build_race_data_enrollment_census(
         classification = "eligible"
         if not (policy.valid_from <= cutoff < policy.valid_until):
             reason = "standing_policy_expired"
+        elif enrollment is not None and enrollment.authority_version == 2:
+            reason = "multisource_claim_required"
         elif event.pk in duplicate_ids:
             reason = "canonical_duplicate"
         elif event.visibility_status not in policy.visibility_statuses:
@@ -1987,6 +1989,144 @@ def build_multisource_coverage(*, now, policy):
     return dict(total=len(entries), counts=counts, entries=entries)
 
 
+def recover_legacy_rotated_multisource(*, event_id, policy, now):
+    """恢复旧单源轮转误写的策略字段；只接受当前两份受审策略及完整v2收据。
+
+    保留当前owner，只恢复原受审来源选择，不修任意漂移。事务内先恢复候选字段，再走完整准入；
+    任一验证失败均回滚。自然发现调用，成功后由普通claim完成采集及发布。
+    """
+    from .race_data_source_adapters import canonical_sha, aware
+    from .race_data_sync_admission import validate_multisource_admission
+
+    Decision = race_data_sync_control.ControlDecision
+    try:
+        with transaction.atomic():
+            event, lifecycle = _lock_multisource_event(event_id)
+            projection = models.RaceEventProjectionControl.objects.select_for_update().filter(event=event).first()
+            tracking = models.RaceEventLiveTracking.objects.select_for_update().filter(event=event).first()
+            enrollment = models.RaceDataSyncEnrollment.objects.select_for_update().filter(event=event).first()
+            if not enrollment or enrollment.authority_version != 2 or enrollment.standing_policy_digest == policy.digest:
+                return Decision("unchanged", "", event_id)
+            if not tracking or not tracking.tracking_enabled or not lifecycle or not projection:
+                raise _MultisourceRejected("recovery_control_missing")
+            if tracking.active_attempt_token and (tracking.claim_expires_at is None or tracking.claim_expires_at > now):
+                raise _MultisourceRejected("active_claim_exists")
+            legacy = parse_standing_policy(load_standing_policy_file(
+                path=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_FILE,
+                expected_sha256=settings.RACE_DATA_SYNC_FUTURE_STANDING_POLICY_SHA256,
+            ))
+            old_digest = enrollment.standing_policy_digest
+            source = enrollment.source_identity
+            legacy_route = next((r for r in legacy.routes if r.enrollment_eligible
+                and r.country_region == event.country_region
+                and (r.provider, r.region_code, r.identity_namespace, r.route_digest) ==
+                    (source.source_key, source.region_code, source.identity_namespace, enrollment.route_digest)), None)
+            if legacy_route is None or not legacy.valid_from <= now < legacy.valid_until:
+                raise _MultisourceRejected("recovery_legacy_route_unproven")
+            evidence = lifecycle.manifest_data.get("race_data_sync", {})
+            manifest = enrollment.source_set_manifest
+            if (old_digest != legacy.digest
+                or not isinstance(manifest, dict)
+                or canonical_sha(manifest) != enrollment.source_set_digest
+                or manifest.get("policy_digest") != policy.digest
+                or evidence != dict(standing_policy_digest=old_digest,
+                    manifest_sha256=enrollment.manifest_sha256,
+                    entry_sha256=enrollment.entry_sha256,
+                    owner_generation=projection.owner_generation)):
+                raise _MultisourceRejected("recovery_not_legacy_rotation")
+            # 真实旧轮转会增加owner/enrollment代次但留下旧v2集合。
+            # 仅接受同代或紧邻的一次轮转，先核对原v2收据再向当前owner重绑。
+            old_source_set_digest = enrollment.source_set_digest
+            generation = projection.owner_generation
+            manifest_generation = manifest.get("owner_generation")
+            if (manifest.get("enrollment_generation") != manifest_generation
+                or manifest_generation not in (generation, generation - 1)
+                or enrollment.enrollment_generation != generation
+                or enrollment.projection_owner_generation != generation
+                or projection.owner_manifest_sha256 != enrollment.manifest_sha256
+                or manifest.get("source_set_generation") != enrollment.source_set_generation
+                or lifecycle.manifest_data.get("race_data_sync_v2") != dict(
+                    source_set_digest=old_source_set_digest,
+                    source_set_generation=enrollment.source_set_generation)):
+                raise _MultisourceRejected("recovery_generation_unproven")
+            alternates = {kind: item for kind, item in manifest.get("alternate", {}).items()
+                if aware(item["expires_at"]) > now}
+            if manifest_generation != generation or alternates != manifest.get("alternate", {}):
+                manifest = {**manifest, "alternate": alternates, "owner_generation": generation,
+                    "enrollment_generation": generation,
+                    "source_set_generation": enrollment.source_set_generation + 1,
+                    "parent_sha256": old_source_set_digest}
+                enrollment.source_set_manifest = manifest
+                enrollment.source_set_generation = manifest["source_set_generation"]
+                enrollment.source_set_digest = canonical_sha(manifest)
+                enrollment.save(update_fields=("source_set_manifest", "source_set_generation", "source_set_digest", "updated_at"))
+                lifecycle.manifest_data = {**lifecycle.manifest_data, "race_data_sync_v2": dict(
+                    source_set_digest=enrollment.source_set_digest,
+                    source_set_generation=enrollment.source_set_generation)}
+                lifecycle.save(update_fields=("manifest_data", "updated_at"))
+            checkpoints = list(models.RaceEventLiveProviderCheckpoint.objects.select_for_update()
+                .filter(tracking=tracking).order_by("pk"))
+            enrollment.standing_policy_digest = policy.digest
+            enrollment.save(update_fields=("standing_policy_digest", "updated_at"))
+            admission = validate_multisource_admission(event_id=event_id, now=now, policy=policy)
+            if not admission.admitted:
+                raise _MultisourceRejected(admission.reason_code)
+            selected = manifest.get("selected", {})
+            if not selected:
+                raise _MultisourceRejected("recovery_selection_missing")
+            active_bindings = set(selected.items()) | {
+                (kind, item["binding_id"]) for kind, item in alternates.items()}
+            for kind, binding_id in sorted(active_bindings):
+                decision = validate_multisource_admission(event_id=event_id, now=now,
+                    policy=policy, capability=kind, binding_id=binding_id)
+                if not decision.admitted:
+                    raise _MultisourceRejected(decision.reason_code)
+                checkpoint = next((c for c in checkpoints
+                    if c.source_key == decision.source.source_key and c.data_kind == kind), None)
+                if checkpoint is None:
+                    raise _MultisourceRejected("recovery_checkpoint_drift")
+                if (checkpoint.contract_digest != decision.route.contract_digest
+                    or checkpoint.registry_digest != decision.route.digest):
+                    # 同provider旧轮转也会重写checkpoint，只接受当前旧路由可证明的精确值。
+                    reason, old_route = race_data_sync_control.resolve_source_route_admission(
+                        source=source, route_digest=enrollment.route_digest, data_kinds=(kind,), now=now)
+                    if (reason or old_route is None or decision.source.pk != source.pk
+                        or checkpoint.contract_digest != old_route.contract_digest
+                        or checkpoint.registry_digest != old_route.registry_digest):
+                        raise _MultisourceRejected("recovery_checkpoint_drift")
+                    checkpoint.contract_digest = decision.route.contract_digest
+                    checkpoint.registry_digest = decision.route.digest
+                checkpoint.next_poll_at = race_data_sync_control.multisource_initial_poll_at(
+                    event=event, kind=kind, now=now)
+                checkpoint.lock_version += 1
+                checkpoint.save(update_fields=("next_poll_at", "lock_version", "contract_digest", "registry_digest", "updated_at"))
+            primary_kind = "result" if "result" in selected else sorted(selected)[0]
+            primary = validate_multisource_admission(event_id=event_id, now=now, policy=policy,
+                capability=primary_kind, binding_id=selected[primary_kind])
+            enrollment.source_identity = primary.source
+            enrollment.route_digest = primary.route.digest
+            enrollment.save(update_fields=("source_identity", "route_digest", "updated_at"))
+            lifecycle.manifest_data = {**lifecycle.manifest_data,
+                "race_data_sync": {**evidence, "standing_policy_digest": policy.digest}}
+            lifecycle.save(update_fields=("manifest_data", "updated_at"))
+            tracking.claim_generation += 1
+            tracking.lock_version += 1
+            tracking.active_attempt_token = ""
+            tracking.claim_expires_at = None
+            tracking.next_poll_at = race_data_sync_control._multisource_tracking_due(
+                enrollment, tracking, selected, manifest.get("alternate", {}))
+            tracking.save()
+            models.OperationLog.objects.create(admin=None, action_type="multisource_auto_recovery",
+                target_type="race_event", target_id=str(event_id), detail=json.dumps(dict(
+                    reason="legacy_rotation", old_policy_digest=old_digest,
+                    policy_digest=policy.digest, old_source_set_digest=old_source_set_digest,
+                    source_set_digest=enrollment.source_set_digest,
+                    owner_generation=projection.owner_generation, next_poll_at=str(tracking.next_poll_at))))
+            return Decision("recovered", "legacy_rotation", event_id, tracking.claim_generation)
+    except (_MultisourceRejected, OSError, ValueError, TypeError) as exc:
+        return Decision("rejected", str(exc), event_id)
+
+
 def discover_multisource_events(*, now, policy=None, fetcher=None):
     from stable.services.race_data_source_adapters import (
         load_multisource_policy,
@@ -2096,7 +2236,11 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
         routes.sort(key=lambda r: (r.tiebreak_order, r.provider, r.region))
         offset = state.get("route_cursor", 0) % max(1, len(routes))
         routes = (routes[offset:] + routes[:offset])[:2]
+        recovery = recover_legacy_rotated_multisource(event_id=event.pk, policy=policy, now=now)
         results = []
+        if recovery.action != "unchanged":
+            results.append(dict(reason=recovery.reason_code, action=recovery.action))
+            routes = []
         for route in routes:
             try:
                 if not settings.RACE_DATA_SYNC_ALLOW_NETWORK:
@@ -2158,5 +2302,8 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
                     "source_discovery_v2": current,
                 }
                 event.save(update_fields=("source_refs", "updated_at"))
-        outcomes.append(dict(event_id=event.pk, reason="checked", sources=results))
+        outcome = dict(event_id=event.pk, reason="checked", sources=results)
+        if recovery.action != "unchanged":
+            outcome.update(action=recovery.action, reason=recovery.reason_code)
+        outcomes.append(outcome)
     return dict(enabled=True, coverage=coverage, attempted=processed, outcomes=outcomes)

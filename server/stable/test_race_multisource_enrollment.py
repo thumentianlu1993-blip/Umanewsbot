@@ -179,6 +179,137 @@ class MultisourceClaimTests(TestCase):
         self.assertEqual(claim.checkpoint_plan[0]["source_key"], "alternate")
 
 
+    def test_legacy_rotation_cannot_replace_multisource_authority(self):
+        from stable.services.race_data_sync_control import rotate_enrollment
+        enrollment = models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        before = models.RaceDataSyncEnrollment.objects.values().get(pk=enrollment.pk)
+        decision = rotate_enrollment(
+            event_id=self.event.pk, source_identity_id=enrollment.source_identity_id,
+            standing_policy_digest="c"*64, route_digest="d"*64,
+            event_snapshot_sha256="e"*64, successor_manifest_sha256="f"*64,
+            successor_entry_sha256="a"*64,
+            expected_manifest_sha256=enrollment.manifest_sha256,
+            expected_owner_generation=enrollment.projection_owner_generation,
+            data_kinds=("result",), now=NOW)
+        self.assertEqual(decision.reason_code, "multisource_claim_required")
+        self.assertEqual(models.RaceDataSyncEnrollment.objects.values().get(pk=enrollment.pk), before)
+
+    def _legacy_overwrite(self, *, rotate=False):
+        from types import SimpleNamespace
+        enrollment = models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        if rotate:
+            from stable.services.race_data_sync_control import rotate_enrollment
+            # 仅关闭新增v2入口guard，运行真实旧轮转的全部写入逻辑。
+            enrollment.authority_version = 1
+            enrollment.save()
+            route_binding = SimpleNamespace(contract_digest="a"*64, registry_digest="b"*64)
+            mock=patch('stable.services.race_data_sync_control.resolve_source_route_admission', return_value=("",route_binding))
+            mock.start();self.addCleanup(mock.stop)
+            decision=rotate_enrollment(event_id=self.event.pk,source_identity_id=enrollment.source_identity_id,
+                standing_policy_digest="c"*64,route_digest=enrollment.route_digest,
+                event_snapshot_sha256="d"*64,successor_manifest_sha256="e"*64,successor_entry_sha256="f"*64,
+                expected_manifest_sha256=enrollment.manifest_sha256,
+                expected_owner_generation=enrollment.projection_owner_generation,data_kinds=("result",),now=NOW)
+            self.assertEqual(decision.action,'rotated',decision)
+            enrollment.refresh_from_db();enrollment.authority_version=2;enrollment.save()
+        else:
+            enrollment.standing_policy_digest = "c"*64
+            enrollment.save()
+        control = models.RaceEventLifecycleControl.objects.get(event=self.event)
+        control.manifest_data['race_data_sync']['standing_policy_digest'] = "c"*64
+        control.save()
+        models.RaceEventLiveTracking.objects.filter(event=self.event).update(next_poll_at=None)
+        models.RaceEventLiveProviderCheckpoint.objects.filter(tracking__event=self.event).update(next_poll_at=None)
+        source = enrollment.source_identity
+        legacy = SimpleNamespace(digest="c"*64, valid_from=NOW-timedelta(days=1), valid_until=NOW+timedelta(days=1),
+            routes=[SimpleNamespace(enrollment_eligible=True, country_region=self.event.country_region,
+                provider=source.source_key, region_code=source.region_code,
+                identity_namespace=source.identity_namespace, route_digest=enrollment.route_digest)])
+        for target, value in [('load_standing_policy_file', {}), ('parse_standing_policy', legacy)]:
+            mock=patch('stable.services.race_data_sync_enrollment.'+target, return_value=value)
+            mock.start();self.addCleanup(mock.stop)
+
+    @override_settings(RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED=True)
+    def test_discovery_recovers_proven_legacy_overwrite_without_network(self):
+        from stable.services.race_data_sync_enrollment import discover_multisource_events, recover_legacy_rotated_multisource
+        from stable.services.race_data_sync_admission import validate_multisource_admission
+        self._legacy_overwrite()
+        with patch('stable.services.race_data_source_adapters.fetch_bound_observation', side_effect=AssertionError('recovery must not fetch')):
+            outcome = discover_multisource_events(now=NOW, policy=self.policy)
+        admission = validate_multisource_admission(event_id=self.event.pk, now=NOW, policy=self.policy)
+        self.assertTrue(admission.admitted, outcome)
+        self.assertEqual(recover_legacy_rotated_multisource(event_id=self.event.pk, policy=self.policy, now=NOW).action, 'unchanged')
+        self.assertEqual(models.OperationLog.objects.filter(action_type='multisource_auto_recovery').count(),1)
+        self.assertEqual(len(self.claim()), 1)
+
+    def test_recovery_restores_real_legacy_rotation_generations_and_checkpoint(self):
+        from stable.services.race_data_sync_enrollment import recover_legacy_rotated_multisource
+        self._legacy_overwrite(rotate=True)
+        decision=recover_legacy_rotated_multisource(event_id=self.event.pk,policy=self.policy,now=NOW)
+        self.assertEqual(decision.action,'recovered',decision)
+        self.assertEqual(len(self.claim()),1)
+        enrollment=models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        self.assertEqual(enrollment.source_set_manifest['owner_generation'],enrollment.projection_owner_generation)
+
+    def test_recovery_restores_alternate_or_returns_to_selected_after_expiry(self):
+        from datetime import datetime
+        from stable.services.race_data_sync_control import finish_multisource_claim
+        from stable.services.race_data_sync_enrollment import recover_legacy_rotated_multisource
+        attach_multisource_observation(observation('alternate'),policy=self.policy,now=NOW)
+        finish_multisource_claim(claim=self.claim()[0],now=NOW,success=False,reason_code='http_403')
+        enrollment=models.RaceDataSyncEnrollment.objects.get(event=self.event)
+        expires=datetime.fromisoformat(enrollment.source_set_manifest['alternate']['result']['expires_at'])
+        self._legacy_overwrite(rotate=True)
+        for expired in [False, True]:
+            with self.subTest(expired=expired),transaction.atomic():
+                now=expires+timedelta(seconds=1) if expired else NOW
+                decision=recover_legacy_rotated_multisource(event_id=self.event.pk,policy=self.policy,now=now)
+                self.assertEqual(decision.action,'recovered',decision)
+                claims=claim_due_enrollments(now=now,batch_size=20,ttl_seconds=240,
+                    enabled_providers=('jra','alternate'),enabled_regions=('japan_jra',),enabled_data_kinds=('result',))
+                self.assertEqual(len(claims),1)
+                self.assertEqual(claims[0].checkpoint_plan[0]['source_key'],'jra' if expired else 'alternate')
+                transaction.set_rollback(True)
+
+    @override_settings(RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED=True)
+    def test_rejected_recovery_respects_discovery_due_and_persists_backoff(self):
+        from stable.services.race_data_sync_enrollment import discover_multisource_events
+        self._legacy_overwrite()
+        models.RaceDataSyncSourceBinding.objects.filter(enrollment__event=self.event).update(valid_until=NOW-timedelta(seconds=1))
+        with patch('stable.services.race_data_source_adapters.fetch_bound_observation',side_effect=AssertionError('must not fetch')):
+            first=discover_multisource_events(now=NOW,policy=self.policy)
+            second=discover_multisource_events(now=NOW,policy=self.policy)
+        self.assertEqual(first['attempted'],1)
+        self.assertEqual(second['attempted'],0)
+        self.event.refresh_from_db()
+        self.assertGreater(self.event.source_refs['source_discovery_v2']['next_poll_at'],NOW.isoformat())
+
+    def test_recovery_refuses_unknown_drift_manual_pause_and_live_claim(self):
+        from stable.services.race_data_sync_enrollment import recover_legacy_rotated_multisource
+        self._legacy_overwrite()
+        for fault in ['manifest', 'generation', 'manual', 'claim', 'checkpoint', 'expired']:
+            with self.subTest(fault=fault), transaction.atomic():
+                if fault == 'manifest':
+                    enrollment=models.RaceDataSyncEnrollment.objects.get(event=self.event)
+                    enrollment.source_set_manifest['policy_digest']='f'*64;enrollment.save()
+                elif fault == 'generation':
+                    models.RaceEventProjectionControl.objects.filter(event=self.event).update(owner_generation=4)
+                elif fault == 'manual':
+                    models.RaceEventLifecycleControl.objects.filter(event=self.event).update(manual_pause_reason='operator')
+                elif fault == 'claim':
+                    models.RaceEventLiveTracking.objects.filter(event=self.event).update(active_attempt_token='worker',claim_expires_at=NOW+timedelta(minutes=2))
+                elif fault == 'checkpoint':
+                    models.RaceEventLiveProviderCheckpoint.objects.filter(tracking__event=self.event).update(contract_digest='f'*64)
+                else:
+                    models.RaceDataSyncSourceBinding.objects.filter(enrollment__event=self.event).update(valid_until=NOW-timedelta(seconds=1))
+                before=list(models.RaceDataSyncEnrollment.objects.values())
+                decision=recover_legacy_rotated_multisource(event_id=self.event.pk,policy=self.policy,now=NOW)
+                self.assertEqual(decision.action,'rejected',decision)
+                self.assertEqual(list(models.RaceDataSyncEnrollment.objects.values()),before)
+                self.assertFalse(models.OperationLog.objects.filter(action_type='multisource_auto_recovery').exists())
+                transaction.set_rollback(True)
+
+
 @override_settings(
     RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED=True,
     RACE_DATA_SYNC_ENABLED=True,

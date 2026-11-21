@@ -292,7 +292,7 @@ def jra_race_key(url):
     return "".join(jra_cname_identity(url).groups()[1:])
 
 
-def parse_jra_observation(page, *, url, route, now):
+def parse_jra_observation(page, *, url, route, now, allow_scratched_card=False):
     """从真实 JRADB 页头和 CNAME 一起证明身份，绝不拼造结果 URL 后缀。"""
     from bs4 import BeautifulSoup
     from stable.race_reference_parsers.jra import _parse_barrier
@@ -386,7 +386,9 @@ def parse_jra_observation(page, *, url, route, now):
         name = field("td.horse .name") or field("td.horse")
         number = field("td.num")
         if not name or not number.isdigit():
-            if not is_result:
+            if not is_result and not (
+                allow_scratched_card and name and number in {"取消", "除外"}
+            ):
                 raise ValueError("jra_roster_partial")
             complete_rows = False
             continue
@@ -613,9 +615,13 @@ def fetch_bound_observation(*, event, route, now, fetcher=None, kind="result", u
         page = fetcher(url, route=route, now=now)
         chain = [url]
         if route.provider == "jra":
-            value = parse_jra_observation(page, url=url, route=route, now=now)
+            value = parse_jra_observation(
+                page, url=url, route=route, now=now, allow_scratched_card=kind == "result"
+            )
             if kind == "result" and not value.get("result_phase"):
-                independent_card = value
+                # 退赛时卡表可能隐藏马号。仅用完整卡证明参赛集合；否则保留原已核名单，
+                # 跟随真实同场结果链接重新验证，不能把缺行卡提升为完整性证据。
+                independent_card = value if value["roster_complete"] else None
                 links = jra_result_links(page, url=url, route=route)
                 # 对每个真实链接解析完整赛事键，忽略展示模式但不忽略任一赛事字段。
                 card_id = jra_race_key(url)

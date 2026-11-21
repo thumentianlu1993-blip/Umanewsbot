@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "base_sha": "f1a76e34beaadb954a67bf0596dd6b023b1dba46",
+  "reason": "修复JRA结果链接、英国原已授权来源名称/跨日冷启动、旧单源覆盖及自动恢复；包含调度/claim/生命周期/正式结果/公开告警与多源登记全模块、英国工作流及选测工具。无迁移、新闻、马匹档案或外部分发变更；共享control只有v2阻断入口，其他登记路径由r0/providers和多源回归覆盖。",
+  "domains": [
+    "race_priority_lifecycle",
+    "module:stable.test_race_multisource_enrollment",
+    "uk_race_automation",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "963f31e9fcbcd8fa16e93bb2f03674e2f88e84592460eddcb47d1c198ac457f8",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "3c19ecfc91d7a654171803ebcb7af563d7b971577c5ab6a51aa69e73ea2c2158",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "0ca1b04d31f57b56e5e8344cf57e059af98f266d53c3d27a45fb90d59eadbec5",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "41c38e13c82a5b2f68a4fb3a751903478885315b1655e55bfbec386897b2f1c7",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "74083cdd27a1b4ec79ba0f883fe8701422bd6730d4d12bc3ec5d904b5976ee59",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "0049f991ec89467611d3eaf8f9c775c68e923b646ef376cfc71b03b90bd38254",
+      "after_hash": "cb76ff773b744414692a089fd464f1da946a6e607b6a5020ce7ba6766f76a316",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "51912db1195cbb1d3f269515d8a6ab0e8482f9c6259f3abd4a2aa934766a1582",
+      "after_hash": "43883a462714153c251b1e91c30d043978e94a88dae08c4dffd6281c4bd5631f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "bc128ff12b50bf7205537129f5d1a2cb972a36b3d3806c18bd0710ed6847ebf9",
+      "after_hash": "33aac486e9a2493725cd5136b31cc7ddb5d84b6cc30a1897d17778655f4272ef",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "496f638ea6d49c2daf427c2c29b21499ea5d428f6e202a6dfa253d1c8ae3f3ef",
+      "after_hash": "27e8090d61b1b02242131c3eb37812667ce455346251e87ca445c675119dbf50",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_collection.py",
+      "status": "modified",
+      "before_hash": "f56daafca8d6f236c3ab7dfe60ab9d2317cae595bd6fdd4eeba9f7e50cbdbbf4",
+      "after_hash": "8933da1b84c483f4528abea3846879112940412546980c45b172beaeeae32014",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_multisource_enrollment.py",
+      "status": "modified",
+      "before_hash": "436bee344958c99017e443bd77c7593ecdddc5a5a17522bf166e44e50b1ae740",
+      "after_hash": "e393f1b810552d4acd9627137b7c38e737f235f1c21306a999f33a9f374a03e6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_multisource_jra.py",
+      "status": "modified",
+      "before_hash": "375f0b8173de67d2aff8b8da515934812cd394b38b0de8d48ba1d2de486e7b82",
+      "after_hash": "db2f49b4f96a0c34ead77eb5edc662ceeda2c942a795356019f48e276aeeb67f",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_collection.py",
+      "status": "modified",
+      "before_hash": "efb2bcfd732f5980d644b1fed608e255e579fccdff22dd2cbec1a939d221ccf0",
+      "after_hash": "60bda6aa7d0e1a2bec44dc91def761fce3c09ad6b9cd95e7c2e70a4883475971",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "cca0036f47db6387c90e9d0a0bc0ab5ee7faeed97af44cce72bed61d31d4b904",
+      "after_hash": "337df61ea3da86c1e491bb17c85256c7adb121ebe72ffb722758651610259db9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

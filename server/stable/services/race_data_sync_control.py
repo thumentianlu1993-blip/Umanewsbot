@@ -758,6 +758,8 @@ def rotate_enrollment(
             .filter(event=event)
             .first()
         )
+        if enrollment is not None and enrollment.authority_version == 2:
+            return ControlDecision("rejected", "multisource_claim_required", event_id)
         source_hint = (
             models.RaceResultSourceIdentity.objects.filter(
                 pk=source_identity_id,
