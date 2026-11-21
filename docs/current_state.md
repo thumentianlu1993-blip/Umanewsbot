@@ -1,3 +1,9 @@
+## 2026-11-22 自动恢复包已发布，英国冷启动身份缺口继续修复
+
+PR #327 合并 `05f87e17`，六应用已于北京时间 01:39 前切换 `ceb7737d`；无迁移，备份及队列/健康通过，发布锁释放。福岛纪念16条正式结果公开、告警解除；法国Chloris已自然恢复并解除告警，另一场已在02:28自然恢复准入，轮询消费及告警解除仍待确认。英国自然发现报 `strong_identity_required`，原批准系列缺少名称/来源身份，整体闭环尚未通过。详见[发布证据](changes/race-auto-recovery-20261122/release_evidence.md)。
+
+用户已要求继续修复英国缺口；采用已提交且未撤销目录收据作身份依据，不新增单场映射或放宽冲突校验。真实冷启动 RED/GREEN 已取得，85项隔离PostgreSQL范围回归通过，独立只读审核无 actionable finding；固定树CI及交付包准备中，新修复未发布。见[后续设计](changes/uk-identity-recovery-20261122/design.md)。
+
 ## 2026-11-15 公开时间 SQL 性能修复已完成实现与本地验收
 
 独立分支 `codex/public-time-query-performance` 基于主线 `67a97939`，为公开时间 SELECT 定点增加单次物化时区名称目录；不改变时间/公开/分页合同，不缓存赛事。真实 PostgreSQL RED 为15次目录函数扫描，优化后投影/相关子查询/union均仅一次。候选 `278dc38b` 的370项固定树隔离范围测试全部通过、零跳过，独立只读review未发现需修正项。[Draft PR #321](https://github.com/thumentianlu1993-blip/Umanewsbot/pull/321) 已建立，最终远端检查以当前head为准。尚未合并或发布；生产只读快照仍运行 `f19c7f2d`，发布依赖PR #320完成上线并冻结新基线，不能混入未上线变更。字体及Nginx/robots保持。见[验证记录](changes/public-time-query-performance/validation.md)和[交付依赖](changes/public-time-query-performance/rollout.md)。

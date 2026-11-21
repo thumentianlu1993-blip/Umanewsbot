@@ -1,3 +1,7 @@
+## 2026-11-22 自动恢复包维护入口
+
+生产六应用运行 `ceb7737ddb9bd30d910145a648c9c32fe1362508`，完整 Compose 链从运行容器标签读取，末尾追加 `/opt/umanews-external-staging/race-auto-recovery-ceb7737d/release-identity.json`。无迁移，原业务配置和额度保留。私有目录保存旧配置、镜像身份、1,253,343,809字节备份及TOC；发布锁已释放，无恢复阻断标记。业务验收及英国后续缺口见[实际记录](changes/race-auto-recovery-20261122/release_evidence.md)。同schema回退范围以原固定包为准，不用宿主旧checkout推断当前代码。
+
 ## 2026-11-14 日本采集后续包维护入口
 
 PR #313 merge `9db3f4ca`，四应用于北京时间 17:36:15 发布固定候选 `661d45ef`。schema0084，无迁移，3 GiB 磁盘阈值及 QQ 关闭保持。维护 Compose 链在采集恢复包链之后追加 `/opt/umanews-external-staging/japan-recovery-661d45ef/release-identity.json`；以运行容器的完整配置链为准。日本 126/204 仅提前 `next_poll_at`，两项原状态及配置备份保存在该目录的私有 `evidence/`。本包应用回滚目标为 `41d3f76c`，正常采集数据保留；未执行回滚。实际自然验收见 [线上证据](changes/collection-recovery-arc/release_evidence.md)。
