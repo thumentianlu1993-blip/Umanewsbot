@@ -70,12 +70,32 @@ class Command(BaseCommand):
     help = "只读审计赛事时间、出马表、赛果和生命周期自动同步"
 
     def add_arguments(self, parser):
+        parser.add_argument("--roster-event-id", type=int)
+        parser.add_argument("--racecard-revision-id", type=int)
+        parser.add_argument("--result-revision-id", type=int)
         parser.add_argument("--cutoff")
         parser.add_argument("--horizon-days", type=int)
         parser.add_argument("--standing-policy-file")
         parser.add_argument("--standing-policy-sha256")
 
     def handle(self, **options):
+        selected = tuple(options.get(name) for name in (
+            "roster_event_id", "racecard_revision_id", "result_revision_id"))
+        if any(value is not None for value in selected):
+            if any(value is None for value in selected):
+                raise CommandError("逐身份诊断必须同时提供 event/racecard/result 三个 ID")
+            if any(options.get(name) is not None for name in (
+                "cutoff", "horizon_days", "standing_policy_file", "standing_policy_sha256")):
+                raise CommandError("逐身份诊断不能与原审计参数混用")
+            from dataclasses import asdict
+            from stable.services.race_result_roster_orm import load_persisted_roster_reconciliation
+            try:
+                report = load_persisted_roster_reconciliation(
+                    event_id=selected[0], racecard_revision_id=selected[1], result_revision_id=selected[2])
+            except ValueError as exc:
+                raise CommandError(str(exc)) from exc
+            self.stdout.write(json.dumps(asdict(report), ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+            return
         cutoff = _aware(options.get("cutoff"))
         horizon_days = options.get("horizon_days") or int(
             settings.RACE_DATA_SYNC_FUTURE_HORIZON_DAYS
