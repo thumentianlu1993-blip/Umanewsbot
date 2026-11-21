@@ -3784,7 +3784,8 @@
     "stable.test_p01_main_integration": "django",
     "stable.test_hkjc_name_catalog": "django",
     "stable.test_race_priority_lifecycle": "django",
-    "stable.test_historical_target_reconciliation": "django"
+    "stable.test_historical_target_reconciliation": "django",
+    "stable.test_uk_identity_recovery": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {
