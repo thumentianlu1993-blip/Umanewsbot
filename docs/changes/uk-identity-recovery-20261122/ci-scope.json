@@ -1,0 +1,134 @@
+{
+  "schema_version": 1,
+  "base_sha": "05f87e17d5d5574dd126e1f8b81fab3ebb56b993",
+  "reason": "仅英国已审核目录身份冷启动；共享身份解析新增英国受审收据锚点，其他来源早退不变。覆盖英国全模块、既有跨来源身份种子全域、多源结果/claim/公开覆盖、核心和选测工具；无迁移、新闻或其他公开规则变更。",
+  "domains": [
+    "uk_race_automation",
+    "france_identity_seed",
+    "race_results",
+    "module:stable.test_race_public_coverage",
+    "infrastructure"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d158eef5fca90c8f7b3fd508f1ed3118ad515db68c1556f493bb66143cd7f05e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/rollout.md",
+      "status": "modified",
+      "before_hash": "3c19ecfc91d7a654171803ebcb7af563d7b971577c5ab6a51aa69e73ea2c2158",
+      "after_hash": "0e06634f90e2107ea7661af267b470f72430a694546ab39fa0f8e89ae64f2fda",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-auto-recovery-20261122/uk_followup.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "81cdd553da9b95f9c5c93960293c861f49704b973c5cfdf5b8b93c3b8419b634",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-identity-recovery-20261122/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "94b2f786c3a8785b528da932b10d1a4b54e8a8b9a25729025464c323cd6eeddd",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-identity-recovery-20261122/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "04f02bdb34276f72eacbfe3a61c633cf61ea2b5ac72450d1a4ecb215c0589065",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-identity-recovery-20261122/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "df57353641b18eb014ee1d7a21d5317af2603008f72af5f256acac56861d4481",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-identity-recovery-20261122/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "034c4d3418227d2ddb80f7ccf2185272c1b867bc3aa63da442fc14b38adfe88b",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/uk-identity-recovery-20261122/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "90a4ba19390bfe97ca0c7eaf7ae59740033dd78d8efb7eef3d940af225f15603",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "cb76ff773b744414692a089fd464f1da946a6e607b6a5020ce7ba6766f76a316",
+      "after_hash": "beac64f3c8c80bef5d96c90aa9b136c1f12f4bc5c8f5acb81cbe0a10c869c98c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "e072452ac78d6924ba5a863d2b5584f36de46070e3a0a778854c580652ed1c1e",
+      "after_hash": "ef3319a817deb6b3cad50fc7c0e57a3f538fee039560021af7bf11eae046e54b",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_source_identity.py",
+      "status": "modified",
+      "before_hash": "9cbb6957afadacae80dae8c2713e47b6b4680eb51d3ed24679a6e8d4eeac1a9b",
+      "after_hash": "b31a8bd4d503ae2fd80b8e6a7566c270f18ab0ccebdbf31bb93b0de401af767a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_catalogue_identity.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "e500bfa515d9ffe445beff8f8f5bcf3a42ec3515d756d2b44de05e39b964041d",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_identity_recovery.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "59428d4a907a3d43a4b71e1cb84ba3379f64762fd9dfe99549ce38170c259743",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "8740853e03aa0ac45f8bda6224c5bd4cb154dc67210fc292298611ada7fa5e87",
+      "after_hash": "b1e674dcfd3a201251522327278019b23b46df706a70e3e628f58496284e8ca6",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "337df61ea3da86c1e491bb17c85256c7adb121ebe72ffb722758651610259db9",
+      "after_hash": "cc09f52cb7b08d37441affca00f153970358e2f5cac88bc6bc5cd84abc302a68",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

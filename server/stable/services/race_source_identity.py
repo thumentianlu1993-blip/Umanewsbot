@@ -354,6 +354,11 @@ def resolve_observation(value, *, route, now, archive_receipt=None):
             if _event_context(event, value, route):
                 targets.add(event.pk)
                 evidence["series_name_id"] = name.pk
+    from .uk_catalogue_identity import released_catalogue_targets
+    catalogue_targets = released_catalogue_targets(value, route=route)
+    if catalogue_targets:
+        targets.update(catalogue_targets)
+        evidence["uk_catalogue_receipts"] = catalogue_targets
     seed = _seed_target(value, route)
     if seed:
         targets.add(seed)

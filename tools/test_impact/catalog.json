@@ -978,7 +978,8 @@
       "stable.test_uk_pre_race",
       "stable.test_uk_release",
       "stable.test_uk_sources",
-      "stable.test_uk_workflow"
+      "stable.test_uk_workflow",
+      "stable.test_uk_identity_recovery"
     ],
     "module:stable.test_five_region_race_governance": [
       "stable.test_five_region_race_governance"
@@ -3405,6 +3406,12 @@
       "label": "stable.test_historical_target_reconciliation",
       "domains": [
         "module:stable.test_historical_target_reconciliation"
+      ]
+    },
+    "server/stable/test_uk_identity_recovery.py": {
+      "label": "stable.test_uk_identity_recovery",
+      "domains": [
+        "uk_race_automation"
       ]
     }
   },

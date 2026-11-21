@@ -1912,6 +1912,12 @@
     ],
     "docs/changes/race-auto-recovery-20261122/ci-scope.json": [
       "infrastructure"
+    ],
+    "server/stable/services/uk_catalogue_identity.py": [
+      "uk_race_automation"
+    ],
+    "docs/changes/uk-identity-recovery-20261122/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -2163,6 +2169,7 @@
     "docs/changes/france-identity-seed/ci-scope.json",
     "docs/changes/race-grades-2025-gaps/ci-scope.json",
     "docs/changes/tokyo-turf-display/ci-scope.json",
-    "docs/changes/race-auto-recovery-20261122/ci-scope.json"
+    "docs/changes/race-auto-recovery-20261122/ci-scope.json",
+    "docs/changes/uk-identity-recovery-20261122/ci-scope.json"
   ]
 }
