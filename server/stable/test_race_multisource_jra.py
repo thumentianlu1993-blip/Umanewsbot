@@ -870,6 +870,57 @@ class JraColdStartTests(TestCase):
         self._check_result_correction(explicit=True, unchanged=True)
 
 
+    def test_scratched_card_number_does_not_block_linked_result(self):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(self.card, 'html.parser')
+        result_soup = BeautifulSoup(self.result, 'html.parser')
+        result_row = result_soup.select_one('.race_header').find_parent('table').select('tbody > tr')[-1]
+        number = result_row.select_one('td.num').get_text(strip=True)
+        row = next(tr for tr in soup.select_one('.race_header').find_parent('table').select('tbody > tr')
+            if tr.select_one('td.num').get_text(strip=True) == number)
+        row.select_one('td.num').string = '取消'
+        result_row.select_one('td.place').string = '取消'
+        self.result = str(result_soup)
+        self.card = str(soup)
+        self.enroll()
+        result = run_multisource_claim(claim=self.claim(), now=NOW, fetcher=self.fetch)
+        self.assertTrue(result['processed'], result)
+        self.event.refresh_from_db()
+        self.assertEqual((self.event.status, self.event.results.count()), ('finished', 13))
+
+
+    @override_settings(RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED=True, RACE_DATA_COVERAGE_ALERTS_ENABLED=True)
+    def test_automatic_recovery_publishes_and_resolves_sent_incident(self):
+        from stable.test_race_multisource_enrollment import MultisourceClaimTests
+        from stable.services.race_data_sync_enrollment import discover_multisource_events
+        from stable.services.race_events import resolve_race_live_public_read
+        from stable.services.race_public_coverage import reconcile_public_race_coverage
+        from stable.tasks import select_due_race_data_sync_task, sync_race_event_provider_task
+        self.enroll()
+        MultisourceClaimTests._legacy_overwrite(self)
+        incident=models.RaceLiveAlertIncident.objects.create(alert_type='official_overdue',
+            scope_type='data_sync_event',scope_key=str(self.event.pk),dedupe_key='automatic-recovery',
+            status='sent',opened_at=NOW-timedelta(hours=1),last_seen_at=NOW,
+            alert_sent_at=NOW-timedelta(minutes=30))
+        self.assertEqual(discover_multisource_events(now=NOW,policy=self.policy)['outcomes'][0]['action'],'recovered')
+        # 恢复检查点不提前清除业务告警；仍须正式结果发布。
+        incident.refresh_from_db();self.assertEqual(incident.status,'sent')
+        with patch('stable.tasks.sync_race_event_provider_task.apply_async') as dispatch, self.captureOnCommitCallbacks(execute=True):
+            selected=select_due_race_data_sync_task()
+        self.assertEqual(selected['dispatched'],1)
+        # worker用同一claim校验链消费；重复旧claim不能再发布。
+        kwargs=dispatch.call_args.kwargs['kwargs']
+        with patch('stable.services.race_data_source_adapters.fetch_source_page', side_effect=self.fetch):
+            result=sync_race_event_provider_task(**kwargs)
+        self.assertTrue(result['processed'],result)
+        self.assertTrue(resolve_race_live_public_read(event_id=self.event.pk,now=NOW).visible)
+        reconcile_public_race_coverage(now=NOW)
+        incident.refresh_from_db();self.assertEqual(incident.status,'resolved')
+        with patch('stable.services.race_data_source_adapters.fetch_source_page', side_effect=AssertionError('stale claim')):
+            sync_race_event_provider_task(**kwargs)
+        self.assertEqual(models.RaceEventRevisionPublication.objects.count(),1)
+
+
 def policy_payload_v2():
     """同一 route 的 venue/有效期扩版：digest 必然漂移，用于换绑测试。"""
     payload = policy_payload()

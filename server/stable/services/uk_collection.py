@@ -106,7 +106,7 @@ def _select_card(event,*,route,now,fetcher):
         if value.get('race_id')!=race_id:raise ValueError('uk_bound_id_changed')
         return value,[document]
     today=now.astimezone(ZoneInfo('Europe/London')).date();offset=(event.local_date-today).days
-    if 0<=offset<=7:
+    if -7<=offset<=7:
         choices,documents=_collection('cards',day=event.local_date,route=route,now=now,fetcher=fetcher)
     elif 7<offset<=60:
         choices,documents=_collection('big',start=today,end=today+timedelta(days=60),route=route,now=now,fetcher=fetcher)
@@ -117,7 +117,9 @@ def _select_card(event,*,route,now,fetcher):
     def matches(row):
         if row.get('region')!='GB' or row.get('date')!=event.local_date.isoformat():return False
         if row.get('course') not in route.venue_aliases[venue]:return False
-        return any(term in name_key(row.get('race_name','')) for term in terms)
+        # 仅赛事名称的明确赛种同义词；不改动马名或放宽日期/赛场/唯一性。
+        race_key = name_key(row.get('race_name','')).replace('steeplechase', 'chase')
+        return any(term.replace('steeplechase', 'chase') in race_key for term in terms)
     found=[row for row in choices if matches(row)]
     if not found and 0<=offset<=7:
         choices,extra=_collection('big',start=today,end=today+timedelta(days=60),route=route,now=now,fetcher=fetcher)
@@ -180,6 +182,14 @@ def fetch_payload(*,event,route,now,fetcher=None):
             or event.local_date is None):raise ValueError('uk_event_scope')
     raw,documents=_select_card(event,route=route,now=now,fetcher=fetcher)
     if raw is None:return dict(stage='not_published',roster=[],source_documents=documents)
+    if raw.get('race_status') == 'result' and not any(
+            doc['url'] == api_url('card', race_id=raw['race_id']) for doc in documents):
+        # 冷启动必须补取同一已发现ID的独立卡原件，结果列表不能替代完整参赛集合证据。
+        race_id = raw['race_id']
+        raw, document = _request(api_url('card', race_id=race_id), route=route, now=now, fetcher=fetcher)
+        if raw.get('race_id') != race_id:
+            raise ValueError('uk_bound_id_changed')
+        documents.append(document)
     if raw.get('date')!=event.local_date.isoformat() or _venue(raw.get('course'),route)!=_venue(event.racecourse,route):
         raise ValueError('uk_event_identity')
     value=parse_preview(raw)

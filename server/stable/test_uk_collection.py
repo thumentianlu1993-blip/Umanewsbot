@@ -165,3 +165,35 @@ class UKPaidRuntimeTransportTests(SimpleTestCase):
                         username='offline', password='offline', timeout_seconds=15,
                         max_response_bytes=1024, allow_redirects=False)
             resolver.assert_not_called()
+
+class UKDiscoveryRecoveryTests(TestCase):
+    def test_steeple_chase_name_and_past_day_recover_same_identity(self):
+        from datetime import timedelta
+        e=event();e.source_refs['uk_target_v1']={'name_keys':['betfairchase','lancashirechase']}
+        e.original_name='Betfair Lancashire Chase'
+        c=card();c['runners'].pop();c['race_name']='Betfair Steeple Chase (Registered As The Lancashire Steeple Chase)'
+        r=result();r['non_runners']='';r['race_name']=c['race_name']
+        calls=[]
+        def fetch(url,**kwargs):
+            calls.append(url)
+            return r if '/results/' in url else c if '/rac_123/' in url else {'racecards':[c],'total':1}
+        value=fetch_payload(event=e,route=route(),now=NOW+timedelta(days=1),fetcher=fetch)
+        self.assertEqual(value['result_phase'],'official')
+        self.assertEqual(value['external_race_id'],'rac_123')
+        from stable.services.uk_race_source import source_observation, validate_final_roster
+        normalized=source_observation(value,route=route(),now=NOW+timedelta(days=1))
+        self.assertTrue(validate_final_roster(normalized))
+        self.assertEqual(len(calls),3)
+
+    def test_identical_steeple_name_remains_discoverable(self):
+        from stable.services.uk_sources import name_key
+        for name in ['BetMGM Handicap Steeple Chase', 'BetMGM Handicap Steeplechase', 'BetMGM Handicap Steeple-Chase']:
+            for explicit_key in [True, False]:
+                with self.subTest(name=name, explicit_key=explicit_key):
+                    e=event();e.original_name=name
+                    e.source_refs['uk_target_v1']={'name_keys':[name_key(name)]} if explicit_key else {}
+                    c=card();c['race_name']=name;c['race_status']='entry';c['field_size']='3'
+                    def fetch(url,**kwargs):
+                        return c if '/rac_123/' in url else {'racecards':[c],'total':1}
+                    value=fetch_payload(event=e,route=route(),now=NOW,fetcher=fetch)
+                    self.assertEqual(value['external_race_id'],'rac_123')

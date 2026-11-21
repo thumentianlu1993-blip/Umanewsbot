@@ -1909,6 +1909,9 @@
     ],
     "server/stable/fixtures/race_grade_42_20261116.json": [
       "five_region_race_governance"
+    ],
+    "docs/changes/race-auto-recovery-20261122/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -2159,6 +2162,7 @@
     "docs/changes/public-time-query-performance/ci-scope.json",
     "docs/changes/france-identity-seed/ci-scope.json",
     "docs/changes/race-grades-2025-gaps/ci-scope.json",
-    "docs/changes/tokyo-turf-display/ci-scope.json"
+    "docs/changes/tokyo-turf-display/ci-scope.json",
+    "docs/changes/race-auto-recovery-20261122/ci-scope.json"
   ]
 }
