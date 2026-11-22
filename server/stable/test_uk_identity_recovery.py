@@ -19,6 +19,7 @@ class UKReceiptSQLiteTests(SimpleTestCase):
     def test_sqlite_nul_truncation_never_admits_corrupt_or_oversized_receipt(self):
         import subprocess
         import sys
+        from pathlib import Path
         program = '''
 import os,json
 os.environ['DJANGO_SETTINGS_MODULE']='app.settings'
@@ -36,7 +37,8 @@ with connection.cursor() as c:
   result=_receipt_projection(1,[1],[2])
   assert bool(result)==(not suffix), 'NUL tail was admitted: '+str(len(suffix))
 '''
-        result = subprocess.run([sys.executable, '-c', program], capture_output=True, text=True, timeout=30)
+        result = subprocess.run([sys.executable, '-c', program], cwd=Path(__file__).resolve().parents[1],
+            capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
 
