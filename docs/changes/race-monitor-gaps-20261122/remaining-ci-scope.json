@@ -1,0 +1,140 @@
+{
+  "schema_version": 1,
+  "base_sha": "0e45b16d945ca0d300c79becddc729f292d0479e",
+  "reason": "本次共享入口仅给现有US浏览器NSA PDF分支预留两文档，其他来源路径不变；英国仅在已准入赛果投影补空时间。覆盖五地区采集对照、共享传输/快照/容量、结果投影及核心合同。全量CI7756项的93条失败已在固定主线复跑26方法全部同样复现，保留失败证据；不调整旧失败断言或skip。",
+  "domains": [
+    "us_source_collection",
+    "uk_race_automation",
+    "race_results",
+    "japan_race_automation",
+    "hkjc_source_acceptance",
+    "france_race_automation",
+    "module:stable.test_race_pre_race",
+    "module:stable.test_race_data_sync_providers",
+    "module:stable.test_race_data_sync_r0",
+    "module:stable.test_race_data_sync_pipeline_a",
+    "module:stable.test_race_data_sync_pipeline_a_postgres"
+  ],
+  "changes": [
+    {
+      "path": "deploy/us-browser/collector.cjs",
+      "status": "modified",
+      "before_hash": "464f3e8b6967e401504ac21ea7dda62ed0204b3447e81de24f33ecdfbbe67863",
+      "after_hash": "6c51a440505bc6bbe9289ff42aff45eb7caca26b9898529a3fffd6cddea175f9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "deploy/us-browser/collector.test.cjs",
+      "status": "modified",
+      "before_hash": "66ff0be8fbc97d09aa5fe23ac36c7b7e8d81796d49f1e417e68b8a996ed0931a",
+      "after_hash": "2203bd8d999cd4febf82b61701827e57ee773998c4b6227340108ab265e8e8b3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-monitor-gaps-20261122/remaining_gaps.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4c1e6d86626088d6747ad576d54929f7ed38759cd3c373ab2eb5dcf5841ef66a",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-online-field-gaps/design.md",
+      "status": "modified",
+      "before_hash": "6c3c6dd9b81e91915570d140d5ec75d23d9028a37488ba9e22f2a87d6e198a89",
+      "after_hash": "59c6ebb291e4a51617bde02eb792eeb671447b82c18959bcb73be9d569623841",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-result-directory-fallback-20261122/release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4b66cedea703f7378c04fce14463926521cfdfa02b2246dfd6a569007e7fc013",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/us-result-directory-fallback-20261122/rollout.md",
+      "status": "modified",
+      "before_hash": "da2d0160a57e81033371dbab513a36d052a27a44a9fce3c8fc9a1c6e1a5ca514",
+      "after_hash": "fe33a671fc1b174616289128ae8a4ae2018007b3e055d4063eb67f1aa695bb53",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "055c3bb31d7130e2f53e453d0145daf08afb29e724af47f44bdd28f6dc354a9f",
+      "after_hash": "30792a42023d59b4b594f3603b918f9f1e16ad5be7f374d9765ca81d2c4ed2b5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "1a450138aa2389fae9eaf75977fca6ace537c839e01558f267e9fff49eb75d3f",
+      "after_hash": "4db5c48fc4bccfd284e9179c04e02df3aa183c5bbb05fc335c9b400c6d8cb249",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_results.py",
+      "status": "modified",
+      "before_hash": "89d97541d0518d33868ee7a70d86d6a8411f3ef0142142ecc1d8c511a1ced735",
+      "after_hash": "2d03977622168062a2cdd64b58f9a6d6dd4840ccb514b01195b2acbf6b9a0bf3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "797854c45fbe285bfc39c167f0d3b57b2bc62aadacd200b77292d8c6754efd62",
+      "after_hash": "8c6ab43a8e8dbfca11ef082062d70ea02c2c99327c3fa914fc538d40d67266da",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_basic_fields.py",
+      "status": "modified",
+      "before_hash": "f53245b312dec35fc3d69084c71790dd8fcee166c650f7a45ba0c003d2827b40",
+      "after_hash": "eea65113026a1050239be22d6afd6e52584222c72709dab22e0d795c0d982cbc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_browser_transport.py",
+      "status": "modified",
+      "before_hash": "11f2d3fcd2b2c2b1664da15dc23e3916e402f2f4c9093e2d0f4c2c0306a6cc1d",
+      "after_hash": "238908d3d6dc2368d44c1532c9e633eac8a5537e01b172cf4ec4307e8ac33652",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_uk_workflow.py",
+      "status": "modified",
+      "before_hash": "370e071ed43cb8726a0dce70afbff6d51e1815c5b162e3ed2154538cd729de40",
+      "after_hash": "0cffbd2982b7f0856f853ec6a62548f5a0f434bb5dc4368039b3d78ef293b0b3",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_us_transport.py",
+      "status": "modified",
+      "before_hash": "0c10d5d434693de52b8df6650c3574d8f4e9edf4a094a436a91f985375a27c0c",
+      "after_hash": "5e0d246c39b6dfd89895ec0519ef918c3e0631296d99df1d68a43c99e8dfb2bb",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "7292ebe776d5ce79f22e7b8b564f2c437a84e2ebb9e961d76f7b997ebb79b436",
+      "after_hash": "1ff804457996e7984ca0299b9ea0efbce703efc50f281b1b00fe1c02ebf12bdc",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

@@ -125,3 +125,71 @@ class UKWorkflowTests(TestCase):
         self.assertEqual(self.event.status, 'finished')
         self.assertIsNone(self.event.result_confirmed_at)
         self.assertFalse(self.event.results.exists())
+
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_DATA_KINDS=('race_time','racecard','result'),
+        RACE_DATA_SYNC_ENABLED_FIELDS=('uk_basic.metadata','off_time','local_start_time','timezone_name'))
+    def test_result_only_recovery_fills_missing_schedule_and_replay_is_idempotent(self):
+        from copy import deepcopy
+        data=deepcopy(self.policy.payload)
+        data['routes'][0]['capabilities']=['race_time','racecard','result']
+        self.policy=parse_multisource_policy(data,now=NOW);self.route=self.policy.routes[0]
+        self.source.registry_digest=self.route.digest;self.source.save()
+        with patch('stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy):
+            with override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=False):
+                self.publish();self.event.refresh_from_db()
+            self.assertIsNone(self.event.race_datetime)
+            prior_revisions=self.event.revisions.count()
+            self.publish();self.event.refresh_from_db()
+            self.assertEqual(self.event.revisions.count(),prior_revisions)
+            expected=datetime.fromisoformat(self.result['off_dt'])
+            self.assertEqual(self.event.race_datetime,expected)
+            self.assertEqual(self.event.local_start_time,expected.time())
+            self.assertEqual(self.event.status,'finished')
+            audits=self.event.field_changes.filter(operation_mode='uk_result_time')
+            self.assertEqual(audits.count(),2)
+            self.assertTrue(all(x.observation_id for x in audits))
+            self.assertTrue(all('/v1/results/' in x.source_url for x in audits))
+            count=self.event.revisions.count()
+            self.publish();self.event.refresh_from_db()
+            self.assertEqual(self.event.revisions.count(),count)
+            self.assertEqual(audits.count(),2)
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_DATA_KINDS=('race_time','racecard','result'),
+        RACE_DATA_SYNC_ENABLED_FIELDS=('uk_basic.metadata','off_time','local_start_time','timezone_name'))
+    def test_result_only_source_without_time_capability_cannot_fill_schedule(self):
+        self.publish();self.event.refresh_from_db()
+        self.assertIsNone(self.event.race_datetime)
+        self.assertIsNone(self.event.local_start_time)
+
+
+    @override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=True,
+        RACE_DATA_SYNC_ENABLED_DATA_KINDS=('race_time','racecard','result'),
+        RACE_DATA_SYNC_ENABLED_FIELDS=('uk_basic.metadata','off_time','local_start_time','timezone_name'))
+    def test_result_time_preserves_existing_value_and_all_manual_locks(self):
+        from copy import deepcopy
+        from django.db import transaction
+        from stable.services.uk_basic_fields import fill_result_time_locked
+        data=deepcopy(self.policy.payload);data['routes'][0]['capabilities']=['race_time','racecard','result']
+        self.policy=parse_multisource_policy(data,now=NOW);self.route=self.policy.routes[0]
+        self.source.registry_digest=self.route.digest;self.source.save()
+        with patch('stable.services.race_data_source_adapters.load_multisource_policy',return_value=self.policy):
+            with override_settings(RACE_DATA_SYNC_SCHEDULE_APPLY_ENABLED=False):self.publish()
+            observation=self.event.revisions.get(kind='result').primary_observation
+            self.event.refresh_from_db()
+            for field in ('basic','race_time','off_time','local_date','timezone_name','race_datetime','local_start_time'):
+                with self.subTest(lock=field),transaction.atomic():
+                    self.event.manual_lock_flags={field:True};self.event.save()
+                    self.assertFalse(fill_result_time_locked(event=self.event,source=self.source,
+                        observation=observation,now=NOW,source_class='licensed_api'))
+                    self.event.refresh_from_db();self.assertIsNone(self.event.race_datetime)
+            self.event.manual_lock_flags={}
+            self.event.local_start_time=datetime.fromisoformat('2026-10-30T12:00:00').time();self.event.save()
+            with transaction.atomic():
+                self.assertFalse(fill_result_time_locked(event=self.event,source=self.source,
+                    observation=observation,now=NOW,source_class='licensed_api'))
+            self.event.refresh_from_db();self.assertIsNone(self.event.race_datetime)
+            self.assertEqual(str(self.event.local_start_time),'12:00:00')
+            self.assertFalse(self.event.field_changes.filter(operation_mode='uk_result_time').exists())

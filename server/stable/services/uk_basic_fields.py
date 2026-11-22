@@ -49,3 +49,71 @@ def apply_metadata_locked(*,event,metadata,route,now):
             and (not old_meta.get('observed_at') or observed>=aware(old_meta['observed_at']))):
         refs['uk_race_metadata']=metadata;event.source_refs=refs;changed.append('source_refs')
     if changed:event.save(update_fields=changed+['updated_at'])
+
+
+def fill_result_time_locked(*, event, source, observation, now, source_class):
+    """正式赛果补齐空缺计划时间；不覆盖已有时刻，不借赛果选源取得时间写权。"""
+    from zoneinfo import ZoneInfo
+    from .race_data_source_adapters import aware, canonical_sha
+    from .race_data_sync_admission import validate_multisource_admission
+    from .race_data_sync_pipeline import RaceDataSyncFlags, _audit_defaults
+    from .race_data_sync_policy import arbitrate_source_value, source_priority
+    flags = RaceDataSyncFlags.from_settings()
+    if (event.country_region != 'united_kingdom' or source.source_key != 'the_racing_api'
+            or source.region_code != 'united_kingdom' or event.timezone_name != 'Europe/London'
+            or not flags.schedule_apply_enabled or not all(flags.allows(
+                provider=source.source_key, region=source.region_code, field_name=f)
+                for f in ('off_time', 'local_start_time', 'timezone_name'))):
+        return False
+    admission = validate_multisource_admission(event_id=event.pk, now=now, capability='race_time')
+    if not admission.admitted or admission.source.pk != source.pk:
+        return False
+    payload = observation.normalized_payload
+    if not payload.get('off_time'):
+        return False
+    stamp = aware(payload['off_time'])
+    local = stamp.astimezone(ZoneInfo(event.timezone_name))
+    if local.date() != event.local_date or stamp > now:
+        raise ValueError('uk_result_clock_date')
+    proposed = dict(race_datetime=stamp, local_start_time=local.time().replace(tzinfo=None))
+    # 仅填洞；已有字段必须一致，避免一半来自旧时刻、一半来自新时刻。
+    if any(getattr(event, field) not in (None, value) for field, value in proposed.items()):
+        return False
+    locks = set(proposed) | {'basic', 'race_time', 'off_time', 'local_date', 'timezone_name'}
+    if any((event.manual_lock_flags or {}).get(f) for f in locks) or event.field_authorities.filter(
+            subject_type='event', subject_key=str(event.pk), field_name__in=locks, manual_lock=True).exists():
+        return False
+    observed = observation.source_updated_at or observation.observed_at
+    if observed > now:
+        raise ValueError('uk_result_clock_observed_at')
+    authorities = {}
+    for field, value in proposed.items():
+        if getattr(event, field) is not None:
+            continue
+        authority = event.field_authorities.select_for_update().filter(
+            subject_type='event', subject_key=str(event.pk), field_name=field).first()
+        authorities[field] = authority
+        decision = arbitrate_source_value(current_source_key=authority.source_key if authority else '',
+            current_source_class=authority.source_class if authority else '',
+            current_observed_at=authority.observed_at if authority else None,
+            candidate_source_key=source.source_key, candidate_source_class=source_class,
+            candidate_observed_at=observed, has_current_value=False, values_equal=False, manual_locked=False)
+        if not decision.apply:
+            return False
+    audit = _audit_defaults(observation=observation, task_id='uk_result_time', run_id='')
+    for field, authority in authorities.items():
+        value = proposed[field]
+        models.RaceEventFieldChange.objects.create(event=event, subject_type='event', subject_key=str(event.pk),
+            field_name=field, old_value=None, new_value=value.isoformat(), applied=True, decision='applied',
+            **{**audit, 'source_class':source_class, 'authority_level':source_priority(source_class),
+               'source_url':observation.field_provenance['source_url'], 'operation_mode':'uk_result_time'})
+        authority = authority or models.RaceEventFieldAuthority(
+            event=event, subject_type='event', subject_key=str(event.pk), field_name=field)
+        authority.source_key=source.source_key; authority.source_class=source_class
+        authority.source_url=observation.field_provenance['source_url']; authority.external_id=source.external_race_id
+        authority.observed_at=observed; authority.authority_level=source_priority(source_class)
+        authority.value_sha256=canonical_sha(value.isoformat()); authority.save()
+        setattr(event, field, value)
+    if authorities:
+        event.save(update_fields=[*authorities, 'updated_at'])
+    return bool(authorities)
