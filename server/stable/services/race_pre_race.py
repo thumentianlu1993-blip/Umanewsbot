@@ -603,6 +603,9 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled, binar
     from .us_browser_transport import uses_browser
     us_browser = provider == 'us_racing' and uses_browser(url)
     document_budget = 2 if browser and urlsplit(url).path.startswith('/JRADB/') else 1
+    if us_browser:
+        from .us_browser_transport import browser_document_budget
+        document_budget = browser_document_budget(url)
     if france_browser:
         from .france_browser_transport import browser_document_budget
         document_budget = browser_document_budget(url)

@@ -17,7 +17,7 @@
 
 ## 官方目录与未来奖金
 
-NSA `/racing/`、NYRA Belmont stakes schedule、Del Mar nomination forms/nominations 使用独立无认证普通 Chromium 只读采集器，默认关闭，单次导航、同源 GET/HEAD 资源、96 请求/30 秒/2 MiB 上限，重定向与挑战页失败；接入现有租约、共享缓存和 host budget。PDF、其他地区仍走已有传输。浏览器不携带个人状态，不绕过验证码。上线需精确发布包列明新服务与 US_BROWSER_URL。
+NSA `/racing/`、NYRA Belmont stakes schedule、Del Mar nomination forms/nominations 使用独立无认证普通 Chromium 只读采集器，默认关闭，单次导航、同源 GET/HEAD 资源、96 请求/30 秒/2 MiB 上限，重定向与挑战页失败；接入现有租约、共享缓存和 host budget。原发布时 PDF、其他地区仍走已有传输；2026-11-22 的 [剩余缺口修复](../race-monitor-gaps-20261122/remaining_gaps.md) 为当前目录明确链接的 NSA PDF 增加受限浏览器读取。浏览器不携带个人状态，不绕过验证码。上线需精确发布包列明新服务与 US_BROWSER_URL。
 
 未来奖金从完整年份/日期、场地、赛事名唯一匹配：优先 NYRA、Del Mar、Churchill、Gulfstream 官方赛程；既有 US Racing graded schedule 可补没有官方金额的目标。冠名与 Invitational 的已核对别名逐项列明，不模糊匹配。级别明确时必须与目标一致。官方同级别来源冲突拒绝，官方与补源金额差异记录且以官方为准。只写 scheduled 事件的计划总奖金，保留来源和 announced 阶段；完赛观测继续写实际奖金。独立来源检查失败不抹去已有候选，奖金与正式卡是否发布分别记录。
 

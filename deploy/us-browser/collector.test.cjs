@@ -24,3 +24,32 @@ test('正常目录只读收集；阻止跨域资源和写请求',async()=>{const
 test('403、登录挑战和第二次导航均失败，不交付空名单',async()=>{
  for(const opts of [{status:403},{title:'Just a moment...'},{title:'Sign in'},{nav:[URL,URL]},{nav:[URL,URL+'other']},{final:URL+'other'},{resources:96},{resources:95,late:1}])await assert.rejects(fake(opts));
 });
+test('NSA PDF只允许公开uploads路径，不接受查询、凭据、其他主机',()=>{
+ assert.equal(validateUrl('https://nationalsteeplechase.com/wp-content/uploads/2026/11/Colonial-Cup-Overnight.pdf').protocol,'https:');
+ for(const u of ['https://nationalsteeplechase.com/wp-content/uploads/2026/11/a.pdf?download=1','https://nationalsteeplechase.com/wp-content/uploads/2026/13/a.pdf','https://www.nationalsteeplechase.com/wp-content/uploads/2026/11/a.pdf'])assert.throws(()=>validateUrl(u));
+});
+async function fakePdf({linked=true,status=200,body=Buffer.from('%PDF-1.7\nexample'),type='application/pdf',final=null,length=null}={}){
+ const url='https://nationalsteeplechase.com/wp-content/uploads/2026/11/Colonial-Cup-Overnight.pdf';
+ let handler,closed=false;const calls=[];const oldFetch=globalThis.fetch,oldDocument=globalThis.document;
+ async function request(target,kind){let outcome='';await handler({request:()=>({url:()=>target,method:()=> 'GET',resourceType:()=>kind,frame:()=>({parentFrame:()=>null})}),continue:async()=>{outcome='continue'},abort:async()=>{outcome='abort'}});calls.push(outcome);assert.equal(outcome,'continue');}
+ globalThis.document={querySelectorAll:()=>linked?[{href:url}]:[]};
+ globalThis.fetch=async(target,opts)=>{
+  assert.equal(target,url);assert.deepEqual(opts,{credentials:'omit',redirect:'error'});await request(target,'fetch');
+  return {status,url:final||url,headers:{get:key=>key==='content-type'?type:key==='content-length'?String(length===null?body.length:length):null},
+   body:new ReadableStream({start(controller){controller.enqueue(new Uint8Array(body));controller.close();}})};
+ };
+ const page={setDefaultTimeout(){},url:()=>URL,title:async()=> 'RACING',goto:async(target)=>{assert.equal(target,URL);await request(target,'document');return {status:()=>200};},evaluate:async(fn,args)=>fn(args)};
+ const chromium={launch:async()=>({newContext:async()=>({route:async(_,fn)=>{handler=fn},newPage:async()=>page}),close:async()=>{closed=true}})};
+ try{return {value:await collect(url,chromium),calls};}
+ finally{globalThis.fetch=oldFetch;if(oldDocument===undefined)delete globalThis.document;else globalThis.document=oldDocument;assert.equal(closed,true);}
+}
+test('PDF只从目录显式链接读取，保留原始字节与摘要并计算两份文档',async()=>{
+ const raw=Buffer.from('%PDF-1.7\n\xff\xfe','latin1'),{value,calls}=await fakePdf({body:raw});
+ assert.deepEqual(Buffer.from(value.bytes_b64,'base64'),raw);
+ assert.equal(value.raw_sha256,require('node:crypto').createHash('sha256').update(raw).digest('hex'));
+ assert.equal(value.document_requests,2);assert.equal(value.navigation_count,1);assert.equal(value.resource_requests,2);assert.equal(calls.length,2);
+});
+test('缺目录链接、403、假PDF、重定向、超限均拒绝，不返回资料',async()=>{
+ for(const opts of [{linked:false},{status:403},{type:'text/html'},{body:Buffer.from('<html>error</html>')},{final:URL},
+   {length:2*1024*1024+1},{body:Buffer.alloc(2*1024*1024+1),length:0}])await assert.rejects(fakePdf(opts));
+});
