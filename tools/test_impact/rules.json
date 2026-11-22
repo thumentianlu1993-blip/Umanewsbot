@@ -1927,6 +1927,9 @@
     ],
     "docs/changes/race-monitor-gaps-20261122/remaining-ci-scope.json": [
       "infrastructure"
+    ],
+    "docs/changes/hkjc-blank-withdrawal-20261122/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -2181,6 +2184,7 @@
     "docs/changes/race-auto-recovery-20261122/ci-scope.json",
     "docs/changes/uk-identity-recovery-20261122/ci-scope.json",
     "docs/changes/race-monitor-gaps-20261122/ci-scope.json",
-    "docs/changes/race-monitor-gaps-20261122/remaining-ci-scope.json"
+    "docs/changes/race-monitor-gaps-20261122/remaining-ci-scope.json",
+    "docs/changes/hkjc-blank-withdrawal-20261122/ci-scope.json"
   ]
 }

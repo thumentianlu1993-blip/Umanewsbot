@@ -1,4 +1,5 @@
 """HKJC 完整赛果从真实离线页面到公开字段的回归。"""
+import gzip
 from datetime import date
 from unittest.mock import patch
 from django.test import TestCase, SimpleTestCase, override_settings
@@ -78,6 +79,44 @@ class HKJCResultFieldTests(TestCase):
             result=self.event.results.get(horse_number=runner.horse_number)
             self.assertEqual(runner.running_status,result.running_status)
         self.assertEqual(self.event.results.get(horse_number='4').running_status,'withdrawn')
+
+    @override_settings(RACE_INFORMATION_NORMALIZED_DISPLAY_ENABLED=True)
+    def test_blank_placing_withdrawal_survives_claim_publication_and_public_page(self):
+        from datetime import datetime, timezone
+        now = datetime(2026, 11, 22, 12, tzinfo=timezone.utc)
+        url = 'https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/11/22&Racecourse=ST&RaceNo=9'
+        self.page = gzip.decompress((ROOT / 'result-blank-withdrawn.html.gz').read_bytes()).decode()
+        self.value = parse_hkjc_observation(self.page, url=url, route=self.policy.routes[0], now=now)
+        self.event.original_name = self.value['raw_names'][0]
+        self.event.local_date = date(2026, 11, 22)
+        self.event.save()
+        self.event.race_series.names.all().delete()
+        models.RaceSeriesName.objects.create(series=self.event.race_series, text=self.event.original_name,
+                                            source_language='en', source_refs={'primary': url})
+        with patch('stable.test_hkjc_public_fields.NOW', now), patch('django.utils.timezone.now', return_value=now):
+            self.publish()
+            self.assertEqual(self.event.results.count(), 10)
+            self.assertEqual(self.event.results.filter(running_status='finished').count(), 9)
+            withdrawn = self.event.results.get(horse_number='3')
+            self.assertEqual(withdrawn.running_status, 'withdrawn')
+            self.assertIsNone(withdrawn.official_finish_position)
+            self.assertTrue(withdrawn.is_confirmed)
+            observation = models.RaceResultObservation.objects.filter(
+                source_identity__event=self.event, result_phase='official').latest('pk')
+            row = next(r for r in observation.normalized_payload['participants'] if r['number'] == '3')
+            self.assertEqual(row['raw_status'], '')
+            self.assertEqual(row['field_provenance']['status']['kind'], 'official_incident_withdrawal')
+            from stable.services.race_events import resolve_race_live_public_read
+            public = resolve_race_live_public_read(event_id=self.event.pk, now=now)
+            self.assertTrue(public.visible, public)
+            response = self.client.get(f'/races/{self.event.year}/{self.event.slug}/')
+            self.assertEqual(response.status_code, 200)
+            from bs4 import BeautifulSoup
+            rows = BeautifulSoup(response.content, 'html.parser').select('#results tbody tr')
+            self.assertEqual(len(rows), 10)
+            cells = next(r.select('td') for r in rows if 'DOCKLANDS' in r.get_text())
+            self.assertEqual(cells[0].get_text(strip=True), '取消出走')
+            self.assertEqual(cells[1].get_text(strip=True), '3')
 
     def test_existing_status_lock_is_not_overwritten(self):
         for row in self.value['roster']:

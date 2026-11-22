@@ -1,3 +1,11 @@
+## 2026-11-22 英国时间与 NSA PDF 修复当前生产入口
+
+生产六应用为 `e4623dae`，OCI 镜像 `3b3483ea484c38e05913e3a51b3ee2b29ddadc0239cea605e3fc52f018c10f20`；现有 `us_browser` 为 `307c04e968ca69aff4a0c08577609d76911cf9e78687b3d6d4897b4e68c1f642`。完整 Compose 链末项为 `/opt/umanews-external-staging/remaining-e4623dae/release-identity.json`，维护时从运行容器标签读取全链，不依赖宿主 checkout。
+
+该私有目录保存 1,274,732,367 字节完整备份、TOC、SHA、冻结旧配置及精确包绑定的 `business_rollback.py`。包 SHA 为 `f689039ac0d5aabb822290a9c2d5b7d816a9bb4288c43025d5ce39919f7960e8`。应用回滚目标 `bdf9c99d`，浏览器回滚目标 `15289f11120dae09c4fe0ecf0a8bb2a4148c47fb4a5e77579e212fd9ed986042`，保留已核实的数据；本次未执行回滚。七服务健康/身份检查通过，发布锁已释放，无迁移、功能开关、配额或公开地区变更。
+
+数据恢复清单仅补英国 21005 两项时间及美国 20926 九匹临时资料，保留原采集时刻和失败退避；不把离线候选等同自动采集恢复，也不把 overnight PP 当正式马号。自动采集需等待既有调度后核对成功时间、来源摘要与实际网页。原赛事监测持续到 11 月 23 日 08:30。见 [发布实况](changes/race-monitor-gaps-20261122/remaining_release_evidence.md)。下文是历史发布入口。
+
 ## 2026-11-22 美国目录滞后修复当前生产入口
 
 生产六应用为bdf9c99d，OCI镜像baed84a54959ce18bbfb8abe2284fc022d48648e40439fc720bf4ff435ecf6e1。完整Compose链末项为 `/opt/umanews-external-staging/us-directory-bdf9c99d/release-identity.json`，维护时仍从容器标签读取全链。该私有目录保存1,270,304,177字节完整备份、TOC、旧配置和精确包绑定的业务回滚脚本；包SHA为12e4f27e304a7bffbcf5abeddbe9d90ac4fe1609a4027b88a5b647349e2673a2，回滚目标a601d973。无迁移/业务配置/额度/开关变化，发布锁已释放。美国568/598/602共27条正式结果及公网逐马验收通过；原监测保持。详见[发布实况](changes/us-result-directory-fallback-20261122/release_evidence.md)。
