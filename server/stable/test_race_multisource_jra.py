@@ -271,7 +271,10 @@ class JraColdStartTests(TestCase):
         self.event.refresh_from_db()
         self.assertEqual(self.event.status, "finished")
         self.assertIsNone(self.event.result_confirmed_at)
-        self.assertLessEqual(self.event.live_tracking.next_poll_at, NOW + timedelta(minutes=1))
+        self.assertEqual(self.event.live_tracking.next_poll_at, NOW + timedelta(minutes=2))
+        checkpoint=self.event.live_tracking.provider_checkpoints.get(source_key='jra', data_kind='result')
+        self.assertEqual(checkpoint.consecutive_failures, 0)
+        self.assertEqual(checkpoint.failure_diagnostic['category'], 'incomplete')
 
     def test_winner_with_pending_other_positions_advances_state_only(self):
         from bs4 import BeautifulSoup

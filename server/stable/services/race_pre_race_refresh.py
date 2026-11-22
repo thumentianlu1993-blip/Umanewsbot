@@ -261,6 +261,10 @@ def fetch_bound_html(url,*,now,region):
     return pre._fetch_bounded_html(url,now=now,provider=provider,region=region,validator=validate_bound_url,enabled=refresh_enabled)
 
 
+from .race_collection_failures import attempt_scope
+
+
+@attempt_scope
 def discover_bound_pre_race(*,now,fetcher=None,clock=timezone.now):
     if not refresh_enabled():return {'checked':0,'reason':'disabled'}
     fetcher=fetcher or fetch_bound_html;checked=attempted=0
@@ -282,6 +286,8 @@ def discover_bound_pre_race(*,now,fetcher=None,clock=timezone.now):
             if complete_refresh(claim,html=html,url=url,now=clock()):checked+=1
             else:pre.finish_pre_race(claim,now=clock(),reason='refresh_commit_not_admitted')
         except (ValueError,OSError) as exc:
+            from .race_collection_failures import capture_exception
+            capture_exception(exc)
             # Parser diagnostics are bounded codes, never arbitrary HTML or response data.
             reason=str(exc) if re.fullmatch(r'[a-z0-9_]{1,80}',str(exc)) else 'refresh_source_parse_failed'
             pre.finish_pre_race(claim,now=clock(),reason=reason,retry_after=getattr(exc,'retry_after',None))

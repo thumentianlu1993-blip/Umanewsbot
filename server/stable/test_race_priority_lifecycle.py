@@ -77,7 +77,7 @@ class PriorityRoutingTests(SimpleTestCase):
         self.assertEqual(claim_queue(claim=claim, event=event, retry=True), "race_realtime_retry")
         event.result_confirmed_at = NOW
         self.assertEqual(claim_queue(claim=claim, event=event), "race_sync_v2")
-        self.assertEqual(retry_delay(priority=True, reason="timeout"), timedelta(minutes=1))
+        self.assertEqual(retry_delay(priority=True, reason="timeout"), timedelta(minutes=5))
         self.assertEqual(retry_delay(priority=True, reason="http_403"), timedelta(hours=1))
 
     def test_background_budget_retries_at_utc_reset(self):

@@ -12,6 +12,8 @@ import time
 from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
+from .race_collection_failures import capture_snapshot, attempt_scope, capture_document, capture_exception
+
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -399,6 +401,7 @@ def cleanup_expired_shared_snapshots(
     )
 
 
+@capture_snapshot
 def _get_or_fetch_shared_snapshot(
     *,
     provider: str,
@@ -647,6 +650,7 @@ def _fair_discovery_bucket_order(
     return tuple((*ordered[offset:], *ordered[:offset]))
 
 
+@attempt_scope
 def discover_the_racing_api_source_identities(
     *,
     now: datetime,
@@ -1082,6 +1086,12 @@ def _fetch_json(
             )
     if not reservation.reserved:
         raise _ProviderSyncError(f"host_reservation_{reservation.reason}")
+    response = None
+    def capture_failed_response():
+        if response is not None and isinstance(response.body, bytes) and len(response.body) <= _MAX_RESPONSE_BYTES:
+            import base64
+            capture_document({'bytes_b64': base64.b64encode(response.body).decode('ascii')},
+                             request_key=url, provider='the_racing_api', region='licensed_api')
     success = False
     error_code = "provider_response_invalid"
     try:
@@ -1105,6 +1115,9 @@ def _fetch_json(
             success = True
             error_code = ""
             return {"_not_found": True}, raw_sha256
+        if response.redirect_url is None and response.status_code != 200:
+            error_code = f'http_{response.status_code}'
+            raise _ProviderSyncError(error_code)
         if (
             response.redirect_url is not None
             or response.status_code != 200
@@ -1121,9 +1134,24 @@ def _fetch_json(
         success = True
         error_code = ""
         return payload, raw_sha256
-    except _ProviderSyncError:
+    except _ProviderSyncError as exc:
+        error_code = exc.reason_code
+        capture_failed_response()
+        capture_exception(exc)
         raise
+    except PermissionError as exc:
+        error_code = 'provider_permission_denied'
+        capture_failed_response()
+        capture_exception(exc)
+        raise _ProviderSyncError(error_code) from exc
+    except OSError as exc:
+        error_code = 'transport_failed'
+        capture_failed_response()
+        capture_exception(exc)
+        raise _ProviderSyncError(error_code) from exc
     except Exception as exc:
+        capture_failed_response()
+        capture_exception(exc)
         raise _ProviderSyncError("provider_response_invalid") from exc
     finally:
         outcome = record_race_live_host_outcome(
@@ -1972,7 +2000,8 @@ def run_the_racing_api_data_sync(
         username, password = _read_secret(settings.RACE_LIVE_TRA_SECRET_ENV_FILE)
         provider_timezone = ZoneInfo(event.timezone_name)
         provider_date = now.astimezone(provider_timezone).date()
-    except Exception:
+    except Exception as exc:
+        capture_exception(exc)
         return ProviderSyncOutcome(False, "source_runtime_contract_rejected", {}, {})
 
     flags = RaceDataSyncFlags.from_settings()
@@ -2042,6 +2071,7 @@ def run_the_racing_api_data_sync(
                         )
                         rows = payload.get("racecards")
                         if not isinstance(rows, list):
+                            capture_document({'response': payload}, request_key=url, provider=source.source_key, region=source.region_code)
                             raise _ProviderSyncError("provider_response_invalid")
                         return payload, 1, len(rows)
 
@@ -2222,6 +2252,7 @@ def run_the_racing_api_data_sync(
                         )
                         rows = page.get("results")
                         if not isinstance(rows, list):
+                            capture_document({'response': page}, request_key=page_url, provider=source.source_key, region=source.region_code)
                             raise _ProviderSyncError("provider_response_invalid")
                         collected.extend(rows)
                         page_hashes.append(page_hash)
@@ -2236,6 +2267,8 @@ def run_the_racing_api_data_sync(
                             "provider_request_budget_exhausted"
                         )
                     if not pagination_complete:
+                        capture_document({'response': page}, request_key=page_url, provider=source.source_key, region=source.region_code)
+                        capture_document({'results': collected, 'page_sha256': page_hashes}, request_key=result_url, provider=source.source_key, region=source.region_code)
                         raise _ProviderSyncError("provider_pagination_incomplete")
                     return {
                         "results": collected,
@@ -2284,6 +2317,9 @@ def run_the_racing_api_data_sync(
                     sleeper=sleeper,
                     allow_not_found=True,
                 )
+                capture_document({'response': exact_result}, request_key=result_url,
+                                 provider=source.source_key, region=source.region_code,
+                                 registry_digest=route.registry_digest)
                 if exact_result.get("_not_found") is not True:
                     response_payload = {
                         "results": [
@@ -2343,6 +2379,9 @@ def run_the_racing_api_data_sync(
                                     username=username, password=password, now=now, clock=clock,
                                     sleeper=sleeper, allow_not_found=True,
                                 )
+                                capture_document({'response': detail}, request_key=detail_url,
+                                                 provider=source.source_key, region=source.region_code,
+                                                 registry_digest=route.registry_digest)
                                 detail_snapshot = parse_the_racing_api_live_results_payload({"results": [detail]})
                                 exact = next((row for row in detail_snapshot.races
                                               if row["external_race_id"] == source.external_race_id), None)
@@ -2353,6 +2392,7 @@ def run_the_racing_api_data_sync(
                                     observation_hashes[models.RaceDataSyncDataKind.RESULT] = raw_sha256
                                     detail_reason = "exact_result_terminal_evidence"
                             except (_ProviderSyncError, ValueError, KeyError, TypeError) as exc:
+                                capture_exception(exc)
                                 detail_reason = getattr(exc, "reason_code", "detail_response_invalid")
                         else:
                             detail_reason = "provider_request_budget_exhausted"
@@ -2435,6 +2475,7 @@ def run_the_racing_api_data_sync(
                         )
                     applied.append(models.RaceDataSyncDataKind.RESULT)
     except _ProviderSyncError as exc:
+        capture_exception(exc)
         return ProviderSyncOutcome(
             False,
             exc.reason_code,
@@ -2443,7 +2484,8 @@ def run_the_racing_api_data_sync(
             tuple(dict.fromkeys(applied)),
             tuple(dict.fromkeys(not_found)),
         )
-    except Exception:
+    except Exception as exc:
+        capture_exception(exc)
         return ProviderSyncOutcome(
             False,
             "provider_execution_failed",

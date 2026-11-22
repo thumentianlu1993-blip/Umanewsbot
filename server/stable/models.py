@@ -1902,6 +1902,7 @@ class RaceEventLiveProviderCheckpoint(TimestampedModel):
     last_source_updated_at = models.DateTimeField(null=True, blank=True)
     consecutive_failures = models.PositiveIntegerField(default=0)
     circuit_reason = models.CharField(max_length=64, blank=True)
+    failure_diagnostic = models.JSONField(default=dict, db_default={}, blank=True)
     stale_at = models.DateTimeField(null=True, blank=True)
     contract_digest = models.CharField(max_length=64, blank=True)
     registry_digest = models.CharField(max_length=64, blank=True)

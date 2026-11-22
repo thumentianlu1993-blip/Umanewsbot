@@ -12,6 +12,8 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 from django.conf import settings
 
+from .race_collection_failures import attempt_scope
+
 KINDS = ("race_time", "racecard", "result")
 REGIONS = (
     "japan_jra",
@@ -939,6 +941,7 @@ def parse_reference_observation(page, *, url, route, now, event=None):
     )
 
 
+@attempt_scope
 def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
     """共享 Celery 入口；网络外采，末端 writer 锁内重新核验同一 claim。"""
     from django.db import transaction
@@ -1200,6 +1203,8 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
             "applied_kinds": applied,
         }
     except (ValueError, RuntimeError, OSError) as exc:
+        from .race_collection_failures import capture_exception
+        capture_exception(exc)
         reason = str(exc)
         if not re.fullmatch("[a-z0-9_-]{1,64}", reason):
             reason = "source_parse_failed"
@@ -1209,6 +1214,7 @@ def run_multisource_claim(*, claim, now, fetcher=None, archive_receipt=None):
             success=False,
             reason_code=reason,
             retry_at=getattr(exc, "retry_after", None),
+            parser_version=route.parser_version,
         )
         return {"processed": False, "reason": reason, "claim_action": decision.action,
                 **({"identity_reason": identity_reason} if identity_reason else {})}

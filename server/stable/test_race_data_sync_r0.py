@@ -654,7 +654,7 @@ class RaceDataSyncEnrollmentControlTests(TestCase):
         )
         self.assertEqual(
             tracking.next_poll_at,
-            NOW + timedelta(minutes=5, seconds=1),
+            NOW + timedelta(hours=1, seconds=1),
         )
 
     def test_invalid_capacity_configuration_blocks_before_provider_execution(self):
