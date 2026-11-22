@@ -1,0 +1,58 @@
+[
+  {
+    "file": "BEL.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2611/BEL2026112109.pdf",
+    "original_sha256": "d5689d50dfed5661f21ae4140c21568b7e2d1cca7138226504ebfb3cc0042047",
+    "observed_at": "2026-11-22T04:44:32.815557+00:00",
+    "sha256": "d5689d50dfed5661f21ae4140c21568b7e2d1cca7138226504ebfb3cc0042047",
+    "extraction": "完整单场原始PDF"
+  },
+  {
+    "file": "BEL.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-11-21/belmont-park/950364/race-9-pebbles-stakes-grade-3",
+    "original_sha256": "e6b3e94149c9f4c214a82fc7ccd48fe6b95f80b5098047822c1d1cf6baa57a14",
+    "observed_at": "2026-11-22T04:45:27.176234+00:00",
+    "sha256": "d338aff9566bf45342e461c260c2a2d74b7386a4151cd917626a8c7c219103f2",
+    "extraction": "仅保留NEXT_DATA与JSON-LD原始结构，去除导航和广告"
+  },
+  {
+    "file": "CD.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2611/CD2026112110.pdf",
+    "original_sha256": "f6e93852366e9aca52497238137e41d1ee49c9de9ce912620d9e25d9fc9111dc",
+    "observed_at": "2026-11-22T04:44:34.109114+00:00",
+    "sha256": "f6e93852366e9aca52497238137e41d1ee49c9de9ce912620d9e25d9fc9111dc",
+    "extraction": "完整单场原始PDF"
+  },
+  {
+    "file": "CD.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-11-21/churchill-downs/950334/race-10-commonwealth-turf-stakes-grade-3",
+    "original_sha256": "600051528f6dbb92f1949839a17d4feb628ae56b73fb1683a1278ce619d07b31",
+    "observed_at": "2026-11-22T04:45:29.206642+00:00",
+    "sha256": "acc500ee0a71b9dbf528910e32764a474ce968f22963c83120bdf9153f462529",
+    "extraction": "仅保留NEXT_DATA与JSON-LD原始结构，去除导航和广告"
+  },
+  {
+    "file": "DMR.pdf",
+    "url": "https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/2611/DMR2026112108.pdf",
+    "original_sha256": "b5c8e46164020147a994ed8f8dac71f5f48196abeb03861d053b8ddb6ee97a66",
+    "observed_at": "2026-11-22T04:44:35.436614+00:00",
+    "sha256": "b5c8e46164020147a994ed8f8dac71f5f48196abeb03861d053b8ddb6ee97a66",
+    "extraction": "完整单场原始PDF"
+  },
+  {
+    "file": "DMR.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-11-22/del-mar/950294/race-8-native-diver-stakes-grade-3",
+    "original_sha256": "81b2718a198f5974c7c432301a463dcefdae80a999280cf9cfd40e1a1b9c7743",
+    "observed_at": "2026-11-22T04:45:30.885233+00:00",
+    "sha256": "cf82e2486cb7e7cf7f85932556ecdebbbf89ec95d6d63e3acf606697efb75fa4",
+    "extraction": "仅保留NEXT_DATA与JSON-LD原始结构，去除导航和广告"
+  },
+  {
+    "file": "sl-day.html",
+    "url": "https://www.sportinglife.com/racing/results/2026-11-21",
+    "original_sha256": "286909df3f0da4c8ace06cda47e666a98e11e33198cafde71611a4a9ef5fd8e9",
+    "observed_at": "2026-11-22T04:45:00.973576+00:00",
+    "sha256": "96d144579a8ae921b2d4e4693e85e54e51ef01d5bc182148500cd369d1c00346",
+    "extraction": "保留三目标会议与对应单场条目；测试中添加冲突/非终报变体"
+  }
+]
