@@ -1,6 +1,6 @@
 from datetime import date, datetime, timedelta, timezone
 from unittest.mock import patch
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 from stable import models
 from stable.services import race_pre_race as pre
 from stable.services.us_pre_race import US, complete, public_us_preview
@@ -69,6 +69,28 @@ class USPreRaceTests(TestCase):
         self.assertEqual(row.get_running_status_display(), '预想参赛')
         self.assertEqual(row_fields(row)['status'].text, '预想参赛')
 
+    def test_colonial_directory_to_preview_preserves_provisional_stage(self):
+        from stable.services.us_pre_race import fetch_preview
+        from stable.test_us_prerelease import FIX
+        target=dict(venue='CAM',local_date='2026-11-22',race_name='COLONIAL CUP',
+                    candidate_key='colonial',provider='nsa',source_race_id='138')
+        self.event.local_date=date(2026,11,22)
+        self.event.source_refs={'us_target_v1':target};self.event.save()
+        def fetch(url,**kw):
+            filename='nsa-colonial-directory-20261122.html' if url.endswith('/racing/') else 'nsa-colonial-overnight-20261122.pdf'
+            return (FIX/filename).read_bytes()
+        payload=fetch_preview(self.event,route=self.route,now=NOW,fetcher=fetch)
+        self.assertEqual((payload['stage'],len(payload['items'])),('declared_overnight',9))
+        self.assertFalse(payload['final_card'])
+        self.assertTrue(all(not r['horse_number'] for r in payload['items']))
+        claim=pre.claim_pre_race(event_id=self.event.pk,source=US,now=NOW)
+        self.assertTrue(complete(claim,payload=payload,route=self.route,now=NOW))
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.data_candidates.count(),1)
+        self.assertFalse(self.event.runners.exists())
+        self.assertFalse(self.event.source_identities.exists())
+        self.assertEqual(public_us_preview(self.event,now=NOW)['label'],'临时出马资料')
+
     def test_unverified_coverage_records_reason_without_publishing_candidate(self):
         claim = pre.claim_pre_race(event_id=self.event.pk, source=US, now=NOW)
         self.assertTrue(complete(claim, payload=dict(stage='coverage_unverified', items=[], source={}), route=self.route, now=NOW))
@@ -113,3 +135,55 @@ class USPreRaceTests(TestCase):
         with patch('stable.services.us_pre_race.route_for',return_value=self.route),patch('stable.services.us_pre_race.fetch_preview',return_value=payload),patch('stable.services.us_pre_race.complete',return_value=True),patch('stable.services.us_pre_race.card_observation',return_value={}),patch('stable.services.race_data_sync_enrollment.attach_multisource_observation',return_value=SimpleNamespace(action='replay',reason_code='')):
             result=discover_us_pre_race(now=NOW,policy=SimpleNamespace(valid=lambda now:True),clock=lambda:NOW)
         self.assertEqual(result,{'checked':1,'errors':[]})
+
+
+class USBoundPreviewGapTests(SimpleTestCase):
+    def test_retained_card_refreshes_after_rolling_index_moves_to_tomorrow(self):
+        from types import SimpleNamespace
+        from stable.services.us_pre_race import fetch_preview
+        from stable.test_us_prerelease import FIX
+        url='https://www.sportinglife.com/racing/racecards/2026-11-21/belmont-park/racecard/950364/race-9-pebbles-stakes-grade-3'
+        target=dict(provider='toba',local_date='2026-11-21',venue='BEL',race_name='PEBBLES S.',candidate_key='pebbles')
+        event=SimpleNamespace(local_date=date(2026,11,21),source_refs={'us_target_v1':target,
+            'us_pre_race_checks':{'stage':'declared_card','source':{'url':url}}})
+        route=SimpleNamespace(permits_url=lambda u:True)
+        raw=(FIX/'pebbles-card-20261121.html').read_bytes();calls=[]
+        def fetch(u,**kw):calls.append(u);return raw
+        with patch('stable.services.us_prerelease_collection.collect_prerace') as collect:
+            value=fetch_preview(event,route=route,now=NOW,fetcher=fetch)
+        collect.assert_not_called()
+        self.assertEqual(calls,[url])
+        self.assertEqual((value['stage'],len(value['items'])),('declared_card',10))
+        self.assertTrue(value['final_card'])
+        for bad in [raw.replace(b'950364',b'950365'),raw.replace(b'Pebbles Stakes',b'Other Stakes'),
+                    raw.replace(b'Belmont Park',b'Churchill Downs'),raw.replace(b'2026-11-21',b'2026-11-20'),
+                    raw.replace(b'race_summary_reference',b'missing_summary_reference')]:
+            with self.subTest(bad=bad[:50]),self.assertRaises(ValueError):
+                fetch_preview(event,route=route,now=NOW,fetcher=lambda u,**kw:bad)
+
+    def test_retained_card_uses_local_date_for_us_evening_race(self):
+        from types import SimpleNamespace
+        from stable.services.us_pre_race import retained_card_preview
+        from stable.test_us_prerelease import FIX
+        raw=(FIX/'sl-remington-livecard.html').read_bytes()
+        url='https://www.sportinglife.com/racing/racecards/2026-11-11/remington-park/racecard/948649/race-1-claiming'
+        event=SimpleNamespace(source_refs={'us_pre_race_checks':{'stage':'declared_card','source':{'url':url}}})
+        store=SimpleNamespace(get=lambda u:dict(body=raw,url=u,sha256='a'*64,fetched_at=NOW.isoformat()))
+        target=dict(venue='RP',local_date='2026-11-11',race_name='Claiming',source_race_id='1')
+        value=retained_card_preview(event,target=target,store=store)
+        self.assertEqual((value['local_date'],value['off_time']),('2026-11-11','2026-11-11T18:30:00-06:00'))
+        self.assertTrue(value['final_card'])
+        with self.assertRaises(ValueError):
+            retained_card_preview(event,target={**target,'local_date':'2026-11-12'},store=store)
+
+    def test_retained_card_rejects_target_race_number_conflict(self):
+        from types import SimpleNamespace
+        from stable.services.us_pre_race import retained_card_preview
+        from stable.test_us_prerelease import FIX
+        raw=(FIX/'pebbles-card-20261121.html').read_bytes()
+        url='https://www.sportinglife.com/racing/racecards/2026-11-21/belmont-park/racecard/950364/race-9-pebbles-stakes-grade-3'
+        event=SimpleNamespace(source_refs={'us_pre_race_checks':{'stage':'declared_card','source':{'url':url}}})
+        store=SimpleNamespace(get=lambda u:dict(body=raw,url=u,sha256='a'*64,fetched_at=NOW.isoformat()))
+        target=dict(venue='BEL',local_date='2026-11-21',race_name='PEBBLES S.',source_race_id='8')
+        with self.assertRaisesMessage(ValueError,'us_retained_card_identity'):
+            retained_card_preview(event,target=target,store=store)

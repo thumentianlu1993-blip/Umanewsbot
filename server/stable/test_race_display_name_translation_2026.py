@@ -1020,3 +1020,32 @@ class ManagementCommandTests(TranslationDbMixin, TransactionTestCase):
                     "--artifact-sha256",
                     manifest_summary["artifactSha256"],
                 )
+
+
+class MonitorGapNameManifestTests(TestCase):
+    """两场已审核系列译名的精确数据包，不更新赛时或其他赛事。"""
+    def test_two_name_manifest_preserves_schedule_and_other_events(self):
+        import hashlib
+        from datetime import date, time
+        from pathlib import Path
+        artifact=Path(__file__).resolve().parents[2]/'docs/changes/race-monitor-gaps-20261122/name-manifest.json'
+        events=[]
+        for pk,name,clock in [(20902,'PRIX CHLORIS',time(13,3)),(20904,'PRIX JACQUES DE VIENNE',time(12,31)),(569,'MANILA S.',time(15,12))]:
+            events.append(RaceEvent.objects.create(id=pk,year=2026,slug=f'monitor-{pk}',original_name=name,
+                chinese_name='',country_region='france' if pk!=569 else 'united_states',
+                local_date=date(2026,11,22),local_start_time=clock,timezone_name='Europe/Paris',
+                source_refs={'retained':'source-evidence'}))
+        before={r['id']:r for r in RaceEvent.objects.filter(id__in=[e.pk for e in events]).values()}
+        result=io.StringIO()
+        call_command('translate_2026_race_display_names',commit=True,artifact=str(artifact),
+            artifact_sha256=hashlib.sha256(artifact.read_bytes()).hexdigest(),backup_sha256='a'*64,
+            backup_size_bytes=1,authorization_ref='isolated-test-only',authorization_time='2026-11-22T02:00:00Z',stdout=result)
+        self.assertEqual(json.loads(result.getvalue())['written'],2)
+        for row in RaceEvent.objects.filter(id__in=before).values():
+            old=before[row['id']]
+            for field in row:
+                if row['id'] in (20902,20904) and field in ('chinese_name','updated_at'):continue
+                self.assertEqual(row[field],old[field],(row['id'],field))
+        self.assertEqual(RaceEvent.objects.get(pk=20902).chinese_name,'克洛里斯锦标')
+        self.assertEqual(RaceEvent.objects.get(pk=20904).chinese_name,'雅克·德维埃纳锦标')
+        self.assertEqual(OperationLog.objects.count(),1)

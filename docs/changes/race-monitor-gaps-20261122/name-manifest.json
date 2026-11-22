@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "race-display-name-translation-2026-manifest.v1",
+  "generatedAt": "2026-11-22T01:59:03.426017+00:00",
+  "contentSha256": "0e284be7e59000f91ff4ea5eb18c37cf22eff0f9b390c520ef68c354a00f47f1",
+  "counts": {
+    "written": 2,
+    "veto": 0,
+    "total": 2
+  },
+  "actions": [
+    {
+      "id": 20902,
+      "before": {
+        "chineseName": ""
+      },
+      "after": {
+        "chineseName": "克洛里斯锦标"
+      },
+      "beforeRow": {
+        "chinese_name": "",
+        "manual_lock_flags": {}
+      }
+    },
+    {
+      "id": 20904,
+      "before": {
+        "chineseName": ""
+      },
+      "after": {
+        "chineseName": "雅克·德维埃纳锦标"
+      },
+      "beforeRow": {
+        "chinese_name": "",
+        "manual_lock_flags": {}
+      }
+    }
+  ],
+  "veto": []
+}

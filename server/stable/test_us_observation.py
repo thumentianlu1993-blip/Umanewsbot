@@ -67,3 +67,48 @@ class USObservationTests(TestCase):
         self.assertEqual(metadata['field_sources']['off_time'],sources['chart'])
         self.assertEqual(metadata['field_sources']['scheduled_off_time'],sources['overnight'])
         with self.assertRaises(ValueError):source_observation(result,target={**target,'book_race_id':'103'},sources=sources,route=route,now=now)
+
+
+class USResultErrorTests(TestCase):
+    def test_missing_chart_reason_and_retry_survive_observation_boundary(self):
+        from datetime import date, timedelta
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from stable.services.us_race_source import fetch_us_observation
+        target=dict(provider='toba',local_date='2026-11-21',venue='BEL',candidate_key='pebbles')
+        event=SimpleNamespace(local_date=date(2026,11,21),source_refs={'us_target_v1':target})
+        route=SimpleNamespace(venue_aliases={'BEL':[]})
+        now=datetime(2026,11,22,1,40,tzinfo=timezone.utc)
+        for reason in ['not_published','us_chart_identity_missing_or_ambiguous','jra_http_403']:
+            with self.subTest(reason=reason),patch('stable.services.us_flat_collection.collect_flat_results',
+                    return_value={'results':[],'errors':[{'reason':reason}]}) as collect:
+                with self.assertRaises(ValueError) as caught:
+                    fetch_us_observation(event=event,route=route,now=now,fetcher=None,kind='result')
+                self.assertEqual(str(caught.exception),reason)
+                if reason=='not_published':
+                    self.assertEqual(caught.exception.retry_after,now+timedelta(minutes=5))
+                self.assertEqual(collect.call_count,1)
+
+    def test_missing_directory_entry_is_distinct_from_conflicting_identity(self):
+        from stable.services.us_flat_collection import select_chart
+        target=dict(venue='BEL',local_date='2026-11-21',race_name='PEBBLES S.',source_race_id='9')
+        row=dict(track='BEL',date='2026-11-21',name='Pebbles S',race_number=9,url='a')
+        with self.assertRaisesRegex(ValueError,'^not_published$'):
+            select_chart(target,[])
+        self.assertEqual(select_chart(target,[row]),row)
+        for rows in [[row,row],[{**row,'race_number':8}]]:
+            with self.assertRaisesRegex(ValueError,'^us_chart_identity_missing_or_ambiguous$'):
+                select_chart(target,rows)
+
+    def test_unsafe_source_error_is_not_copied_into_checkpoint_reason(self):
+        from datetime import date
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from stable.services.us_race_source import fetch_us_observation
+        target=dict(provider='toba',local_date='2026-11-21',venue='BEL',candidate_key='pebbles')
+        event=SimpleNamespace(local_date=date(2026,11,21),source_refs={'us_target_v1':target})
+        with patch('stable.services.us_flat_collection.collect_flat_results',return_value={
+                'results':[],'errors':[{'reason':'request failed: https://example.invalid/private'}]}):
+            with self.assertRaisesRegex(ValueError,'^us_result_unavailable$'):
+                fetch_us_observation(event=event,route=SimpleNamespace(venue_aliases={'BEL':[]}),
+                    now=datetime(2026,11,22,tzinfo=timezone.utc),fetcher=None,kind='result')

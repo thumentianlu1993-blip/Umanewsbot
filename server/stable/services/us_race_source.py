@@ -1,6 +1,7 @@
 """单场美国来源接入：复用已核验采集器与共享预算，不读写公开表。"""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import hashlib
+import re
 from .us_venues import VENUES
 from .us_public_fields import result_participants
 
@@ -126,8 +127,17 @@ def fetch_us_observation(*, event, route, now, fetcher, kind):
             programme_sources={binding['candidate_key']:binding['programme_url']} if binding.get('programme_url') else None)
         results=report['results']
     if len(results)!=1:
-        reasons=[x.get('reason','') for x in report.get('errors',[])]
-        raise ValueError('us_result_unavailable:'+','.join(reasons) if reasons else 'not_published')
+        reasons={x.get('reason','') for x in report.get('errors',[])}
+        reason = next(iter(reasons)) if len(reasons) == 1 else 'us_result_unavailable'
+        if not reasons:
+            reason = 'not_published' if not results else 'us_result_ambiguous'
+        if not re.fullmatch(r'[a-z0-9_-]{1,64}', reason):
+            reason = 'us_result_unavailable'
+        error = ValueError(reason)
+        if reason == 'not_published':
+            # Re-poll a missing directory entry at the US cadence, not every minute.
+            error.retry_after = now + timedelta(minutes=5)
+        raise error
     result=results[0]
     if binding['provider']=='nsa':
         sources=result['sources']

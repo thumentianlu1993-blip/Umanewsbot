@@ -55,6 +55,35 @@ def preview_document(document, *, target):
         final_card=RANK[stage]==3 and data.get('roster_complete') is True)
 
 
+def retained_card_preview(event, *, target, store):
+    """Refresh an already verified card even after the rolling index changes day."""
+    import re
+    from .us_flat_results import next_data, VENUES
+    from .us_prerace_documents import parse_sporting_card
+    from .us_prerelease_collection import _prerace_name
+    previous = (event.source_refs or {}).get('us_pre_race_checks', {})
+    if previous.get('stage') != 'declared_card':
+        return None
+    url = previous.get('source', {}).get('url', '')
+    match = re.fullmatch(r'https://www\.sportinglife\.com/racing/racecards/'
+                        r'(\d{4}-\d{2}-\d{2})/([a-z0-9-]+)/racecard/(\d+)/race-(\d+)-[a-z0-9-]+', url)
+    if not match:
+        return None
+    doc = store.get(url)
+    summary = next_data(doc['body'])['race']['race_summary']
+    course_slug = re.sub(r'[^a-z0-9]+', '-', VENUES[target['venue']][0].lower()).strip('-')
+    name = re.sub(r'^Race \d+ - ', '', summary['name'])
+    name = re.sub(r' - Grade [123]$', '', name)
+    if (str(summary['race_summary_reference']['id']) != match[3]
+            or target['local_date'] != match[1] or course_slug != match[2]
+            or (target.get('source_race_id') and str(target['source_race_id']) != match[4])
+            or _prerace_name(name) != _prerace_name(target['race_name'])):
+        raise ValueError('us_retained_card_identity')
+    value = parse_sporting_card(doc['body'], dict(track=target['venue'],
+        date=target['local_date'], race_number=int(match[4])))
+    return preview_document(dict(data=value, source={k:doc[k] for k in ('url','sha256','fetched_at')}), target=target)
+
+
 def fetch_preview(event, *, route, now, fetcher):
     from .us_race_source import ObservationStore
     from .us_prerelease_collection import collect_prerace, nsa_preview
@@ -67,6 +96,12 @@ def fetch_preview(event, *, route, now, fetcher):
         if document['kind']=='not_published':
             return dict(stage='not_published',items=[],source=document['source'],local_date=target['local_date'])
         return preview_document(document,target=target)
+    try:
+        retained = retained_card_preview(event, target=target, store=store)
+    except (KeyError, TypeError, IndexError) as exc:
+        raise ValueError('us_retained_card_schema') from exc
+    if retained is not None:
+        return retained
     report=collect_prerace(store,start=day,end=day,target_keys={target['candidate_key']},
         flat_report=dict(start=day.isoformat(),end=day.isoformat(),results=[],sources=[]))
     target_rows=[r for r in report['targets'] if r['candidate_key']==target['candidate_key']]

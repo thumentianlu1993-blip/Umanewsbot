@@ -1918,6 +1918,12 @@
     ],
     "docs/changes/uk-identity-recovery-20261122/ci-scope.json": [
       "infrastructure"
+    ],
+    "docs/changes/race-monitor-gaps-20261122/name-manifest.json": [
+      "module:stable.test_race_display_name_translation_2026"
+    ],
+    "docs/changes/race-monitor-gaps-20261122/ci-scope.json": [
+      "infrastructure"
     ]
   },
   "symbols": {
@@ -2170,6 +2176,7 @@
     "docs/changes/race-grades-2025-gaps/ci-scope.json",
     "docs/changes/tokyo-turf-display/ci-scope.json",
     "docs/changes/race-auto-recovery-20261122/ci-scope.json",
-    "docs/changes/uk-identity-recovery-20261122/ci-scope.json"
+    "docs/changes/uk-identity-recovery-20261122/ci-scope.json",
+    "docs/changes/race-monitor-gaps-20261122/ci-scope.json"
   ]
 }

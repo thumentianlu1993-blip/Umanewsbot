@@ -1,3 +1,7 @@
+## 2026-11-22 美国监测缺口诊断入口
+
+`source_parse_failed`可能掩盖美国单场结果收集器拼接的详细错误；先核对DRF当前目录与生产TOBA冻结快照，不重放整年采集。NSA Entries需读取语义标签，当前Colonial Cup为条件册C138/实际第5场，overnight不是最终马号证明。诊断使用独立只读SQL及既有快照，不修改 `/opt/umanews-monitor-20261122`。本次候选尚未发布，定位及恢复边界见[报告](changes/race-monitor-gaps-20261122/report.md)。
+
 ## 2026-11-22 自动恢复包维护入口
 
 生产六应用运行 `ceb7737ddb9bd30d910145a648c9c32fe1362508`，完整 Compose 链从运行容器标签读取，末尾追加 `/opt/umanews-external-staging/race-auto-recovery-ceb7737d/release-identity.json`。无迁移，原业务配置和额度保留。私有目录保存旧配置、镜像身份、1,253,343,809字节备份及TOC；发布锁已释放，无恢复阻断标记。业务验收及英国后续缺口见[实际记录](changes/race-auto-recovery-20261122/release_evidence.md)。同schema回退范围以原固定包为准，不用宿主旧checkout推断当前代码。
