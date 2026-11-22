@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from .us_source_collection import SourceStore, allowed_url
 from .us_racing_sources import parse_toba_calendar
 from .us_flat_results import (VENUES, key, next_data, parse_chart, parse_sporting_life,
-    parse_abr, parse_program_entries, supplement_programs, merge_result)
+    parse_abr, parse_program_entries, supplement_programs, merge_result, sporting_schedule)
 
 DRF_INDEX = 'https://www1.drf.com/StakesResults/MainMenu.do'
 SL_INDEX = 'https://www.sportinglife.com/racing/results/'
@@ -106,6 +106,45 @@ def sl_result_url(raw, identity):
     return matches[0] if matches else None
 
 
+def chart_from_final_summary(target, raw):
+    """DRF月目录已上架、汇总页未更新时，以独立终报确定唯一单场身份。"""
+    matches = []
+    for meeting in next_data(raw)['meetings']:
+        parent = meeting['meeting_summary']
+        course = parent['course']
+        if (course['country']['long_name'] != 'United States'
+                or course['name'] != VENUES[target['venue']][0]):
+            continue
+        for summary in meeting['races']:
+            name = re.fullmatch(r'Race ([1-9][0-9]*) - (.+?) - Grade ([123])', summary['name'])
+            if not name or race_key(re.sub(r' Stakes$', ' S', name[2], flags=re.I)) != race_key(target['race_name']):
+                continue
+            matches.append((parent, summary, name))
+    if not matches:
+        raise ValueError('not_published')
+    if len(matches) != 1:
+        raise ValueError('us_sl_result_identity_ambiguous')
+    parent, summary, name = matches[0]
+    when = sporting_schedule(summary)
+    number = int(name[1])
+    race_id = summary['race_summary_reference']['id']
+    if (parent['date'] != target['local_date']
+            or when.astimezone(ZoneInfo(VENUES[target['venue']][2])).date().isoformat() != target['local_date']
+            or summary['course_name'] != parent['course']['name']
+            or 'G' + name[3] != target['grade'] or not 1 <= number <= 16
+            or type(race_id) is not int or race_id <= 0
+            or (target.get('source_race_id') and str(number) != str(target['source_race_id']))):
+        raise ValueError('us_sl_result_identity_mismatch')
+    if summary['race_stage'] != 'WEIGHEDIN' or summary.get('hidden') or parent.get('abandoned'):
+        raise ValueError('not_published')
+    day = date.fromisoformat(target['local_date'])
+    url = ('https://www1.drf.com/displayChart.do?filepath=/download/simulcastweekly/charts/'
+           + day.strftime('%y%m') + '/' + target['venue'] + day.strftime('%Y%m%d') + f'{number:02}.pdf')
+    return dict(url=url, track=target['venue'], date=target['local_date'], race_number=number,
+                name=target['race_name'], sporting_race_id=race_id, sporting_race_name=summary['name'],
+                sporting_scheduled_at=when.isoformat(), identity_basis='sporting_life_final_summary')
+
+
 def discover_program_entries(identity, *, read, initial):
     """从赛页实际文章链接有界发现；最多四页、两跳，不预填某场文章URL。"""
     from .us_flat_results import parse_abr_program
@@ -188,20 +227,37 @@ def collect_flat_results(store, *, start, end, program_sources=None, target_keys
     used = set()
     for target in targets:
         identity = None
+        identity_doc = None
         result_docs = []
         try:
             today = store.now.astimezone(ZoneInfo(VENUES[target['venue']][2])).date().isoformat()
             if target['local_date'] > today:
                 pending.append(dict(target, status='scheduled'))
                 continue
-            identity = select_chart(target, directory)
+            try:
+                identity = select_chart(target, directory)
+            except ValueError as exc:
+                if str(exc) != 'not_published':
+                    raise
+                identity, day_doc = read_parse(SL_INDEX + target['local_date'],
+                    lambda raw: chart_from_final_summary(target, raw))
+                identity_doc = day_doc
             if identity['url'] in used:
                 raise ValueError('us_chart_reused_for_multiple_targets')
             used.add(identity['url'])
-            chart, chart_doc = read_parse(identity['url'], parse_chart, identity, accept=False)
+            def parse_available_chart(raw, bound_identity):
+                if identity_doc is not None and not raw:
+                    raise ValueError('not_published')
+                return parse_chart(raw, bound_identity)
+            chart, chart_doc = read_parse(identity['url'], parse_available_chart, identity, accept=False)
             result_docs.append(chart_doc)
             day_url = SL_INDEX+identity['date']
-            supplement_url, _ = read_parse(day_url, sl_result_url, identity)
+            if identity_doc is not None:
+                supplement_url = sl_result_url(identity_doc['body'], identity)
+                if not supplement_url:
+                    raise ValueError('not_published')
+            else:
+                supplement_url, _ = read_parse(day_url, sl_result_url, identity)
             if supplement_url:
                 supplement, supplement_doc = read_parse(supplement_url, parse_sporting_life, identity, accept=False)
             else:
@@ -256,6 +312,8 @@ def collect_flat_results(store, *, start, end, program_sources=None, target_keys
                         off_time=chart_actual_time(chart['off_time_raw'],scheduled=anchor,identity=identity),
                         off_time_basis='drf_actual_anchored_to_programme')
             provenance = {'chart': chart_doc['sha256'], 'supplement': supplement_doc['sha256']}
+            if identity_doc is not None:
+                provenance['identity'] = identity_doc['sha256']
             if schedule_doc:provenance['schedule']=schedule_doc['sha256']
             if program_doc:
                 provenance['program'] = program_doc['sha256']

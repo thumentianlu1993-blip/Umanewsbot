@@ -61,7 +61,7 @@ def correction_marker(text):
 
 
 def parse_chart(raw, identity):
-    """只接收来源目录确定的身份；返回表格物理顺序，不以 PP 当马号。"""
+    """接收目录或独立终报确定的身份；返回物理顺序，不以 PP 当马号。"""
     try:
         with pdfplumber.open(BytesIO(raw)) as pdf:
             if not 1 <= len(pdf.pages) <= 2:
@@ -256,6 +256,11 @@ def chart_actual_time(raw, *, scheduled, identity):
 def parse_sporting_life(raw, identity):
     data = next_data(raw)['race']; summary = data['race_summary']
     when = sporting_schedule(summary, raw)
+    if identity.get('identity_basis') == 'sporting_life_final_summary' and (
+            summary['race_summary_reference']['id'] != identity['sporting_race_id']
+            or summary['name'] != identity['sporting_race_name']
+            or when.isoformat() != identity['sporting_scheduled_at']):
+        raise ValueError('us_sl_result_detail_mismatch')
     if (when.astimezone(ZoneInfo(VENUES[identity['track']][2])).date().isoformat() != identity['date']
             or summary['course_name'] != VENUES[identity['track']][0]
             or not re.match(r'Race '+str(identity['race_number'])+r'\b', summary['name'])

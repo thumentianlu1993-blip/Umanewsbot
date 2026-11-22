@@ -9,6 +9,160 @@ FIXTURES = Path(__file__).parent / 'fixtures' / 'us_flat_results'
 TARGETS = json.loads((FIXTURES / 'targets.json').read_text())
 
 
+class USDirectoryLagTests(TestCase):
+    """目录晚于原始PDF时，仍须以终报身份定位并逐马交叉核对。"""
+    FIX = FIXTURES / 'directory_lag'
+
+    def collect(self, *, replace=None, observe=False):
+        import hashlib
+        from datetime import date, datetime, timezone
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from stable.services.us_flat_collection import collect_flat_results, DRF_INDEX, SL_INDEX
+        targets = json.loads((self.FIX / 'targets.json').read_text())
+        metadata = json.loads((self.FIX / 'provenance.json').read_text())
+        documents = {row['url']: (self.FIX / row['file']).read_bytes() for row in metadata}
+        documents['https://toba.org/graded-stakes/2026-races/'] = b'catalogue'
+        # A valid older entry reproduces the live directory lag without copying the full year.
+        documents[DRF_INDEX] = (b'<table><tr><td>DMR</td><td>Bob Hope S (G3)</td><td>'
+            b'<a href="/displayChart.do?filepath=/download/simulcastweekly/charts/2611/DMR2026111508.pdf">Chart</a>'
+            b'</td></tr></table>')
+        if replace:
+            replace(documents, targets)
+        requested = []
+        now = datetime(2026, 11, 22, 5, tzinfo=timezone.utc)
+        def get(url):
+            self.assertIn(url, documents, 'unexpected URL; tests never access network')
+            requested.append(url)
+            body = documents[url]
+            return dict(body=body, url=url, sha256=hashlib.sha256(body).hexdigest(), fetched_at=now.isoformat())
+        store = SimpleNamespace(now=now, request_count=0, get=get, accept=lambda d: None, reject=lambda d: None)
+        with patch('stable.services.us_flat_collection.parse_toba_calendar', return_value=dict(items=targets, unresolved=[])):
+            if observe:
+                from stable.services.us_race_source import fetch_us_observation
+                from stable.services.us_flat_results import VENUES
+                target = targets[0]
+                route = SimpleNamespace(provider='us_racing', region='united_states', identity_namespace='us-test',
+                    operator='us', timezone=VENUES[target['venue']][2], venue_aliases={target['venue']: []},
+                    parser_version='test', permits_url=lambda url: url in documents)
+                event = SimpleNamespace(local_date=date(2026, 11, 21), source_refs={'us_target_v1': target})
+                with patch('django.utils.timezone.now', return_value=now):
+                    value = fetch_us_observation(event=event, route=route, now=now,
+                        fetcher=lambda url, **kwargs: get(url)['body'], kind='result')
+                return value, requested
+            report = collect_flat_results(store, start=date(2026, 11, 21), end=date(2026, 11, 21))
+        return report, requested
+
+    @staticmethod
+    def mutate_document(documents, url, mutate):
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(documents[url], 'lxml')
+        node = soup.find('script', id='__NEXT_DATA__')
+        data = json.loads(node.string)
+        mutate(data['props']['pageProps'])
+        node.string = json.dumps(data)
+        documents[url] = str(soup).encode()
+
+    def test_real_three_results_without_directory_listing(self):
+        from stable.services.us_public_fields import result_participants
+        report, requested = self.collect()
+        self.assertEqual(report['errors'], [])
+        self.assertEqual(report['acceptance'], 'result_source_passed')
+        self.assertEqual(len(report['results']), 3)
+        expected = {'BEL': (10, 0, 'Ground Support'), 'CD': (7, 2, "Gramp's Legacy"),
+                    'DMR': (8, 0, 'Midway Lane')}
+        for result in report['results']:
+            count, scratches, winner = expected[result['track']]
+            self.assertEqual((result['runner_count'], len(result['scratches'])), (count, scratches))
+            self.assertEqual(result['runners'][0]['horse_name'], winner)
+            self.assertEqual(len(result_participants(result)), count + scratches)
+            self.assertIn('/charts/2611/', result['identity']['url'])
+        self.assertTrue(any('/results/2026-11-22/del-mar/' in url for url in requested))
+
+    def test_single_event_observation_retains_identity_proof_and_complete_roster(self):
+        from stable.services.us_race_source import validate_final_roster
+        for venue, total in [('BEL', 10), ('CD', 9), ('DMR', 8)]:
+            def choose(documents, targets):
+                targets[:] = [t for t in targets if t['venue'] == venue]
+            with self.subTest(venue=venue):
+                value, requested = self.collect(replace=choose, observe=True)
+                self.assertTrue(validate_final_roster(value))
+                self.assertEqual(len(value['roster']), total)
+                self.assertEqual(value['result_phase'], 'official')
+                self.assertEqual(value['local_date'], '2026-11-21')
+                self.assertIn('identity', value['roster_evidence']['sources'])
+                self.assertEqual(len(requested), 5)
+
+    def test_invalid_summary_never_probes_chart(self):
+        from stable.services.us_flat_collection import SL_INDEX
+        cases = {
+            'ambiguous': lambda p, s, t: p['races'].append(dict(s)),
+            'wrong_grade': lambda p, s, t: s.update(name=s['name'].replace('Grade 3', 'Grade 2')),
+            'wrong_parent_date': lambda p, s, t: p['meeting_summary'].update(date='2026-11-20'),
+            'wrong_local_date': lambda p, s, t: s.update(date='2026-11-20'),
+            'wrong_course': lambda p, s, t: s.update(course_name='Del Mar'),
+            'wrong_target_number': lambda p, s, t: t.update(source_race_id='8'),
+            'nonfinal': lambda p, s, t: s.update(race_stage='RESULT'),
+            'hidden': lambda p, s, t: s.update(hidden=True),
+            'abandoned': lambda p, s, t: p['meeting_summary'].update(abandoned=True),
+            'bad_id': lambda p, s, t: s['race_summary_reference'].update(id=True),
+        }
+        for label, mutate in cases.items():
+            def replace(documents, targets):
+                targets[:] = targets[:1]
+                def change(page):
+                    meeting = page['meetings'][0]
+                    mutate(meeting, meeting['races'][0], targets[0])
+                self.mutate_document(documents, SL_INDEX + '2026-11-21', change)
+            with self.subTest(case=label):
+                report, requested = self.collect(replace=replace)
+                self.assertEqual(report['results'], [])
+                self.assertEqual(len(report['errors']), 1)
+                self.assertFalse(any('displayChart.do' in u for u in requested))
+
+    def test_directory_conflict_does_not_fall_back(self):
+        from stable.services.us_flat_collection import DRF_INDEX, SL_INDEX
+        def replace(documents, targets):
+            targets[:] = targets[:1]
+            targets[0]['source_race_id'] = '8'
+            documents[DRF_INDEX] = (b'<table><tr><td>BEL</td><td>Pebbles S (G3)</td><td>'
+                b'<a href="/displayChart.do?filepath=/download/simulcastweekly/charts/2611/BEL2026112109.pdf">Chart</a>'
+                b'</td></tr></table>')
+        report, requested = self.collect(replace=replace)
+        self.assertEqual(report['results'], [])
+        self.assertEqual(report['errors'][0]['reason'], 'us_chart_identity_missing_or_ambiguous')
+        self.assertFalse(any(u.startswith(SL_INDEX) for u in requested))
+
+    def test_missing_or_wrong_chart_is_not_accepted(self):
+        for raw, expected in [(b'', 'not_published'), ((self.FIX / 'CD.pdf').read_bytes(), 'us_chart_identity')]:
+            def replace(documents, targets):
+                targets[:] = targets[:1]
+                chart_url = next(u for u in documents if u.endswith('BEL2026112109.pdf'))
+                documents[chart_url] = raw
+            with self.subTest(reason=expected):
+                report, _ = self.collect(replace=replace)
+                self.assertEqual(report['results'], [])
+                self.assertIn(expected, report['errors'][0]['reason'])
+
+    def test_detail_identity_and_partial_roster_fail_closed(self):
+        cases = {
+            'id': lambda p: p['race']['race_summary']['race_summary_reference'].update(id=950365),
+            'name': lambda p: p['race']['race_summary'].update(name='Race 9 - Other Stakes - Grade 3'),
+            'schedule': lambda p: p['race']['race_summary'].update(time='21:44:00'),
+            'partial_roster': lambda p: p['race']['rides'].pop(),
+            'scratch_mismatch': lambda p: p['race']['rides'].append(dict(p['race']['rides'][0], ride_status='NONRUNNER')),
+        }
+        for label, mutate in cases.items():
+            def replace(documents, targets):
+                targets[:] = targets[:1]
+                url = next(u for u in documents if '/950364/' in u)
+                self.mutate_document(documents, url, mutate)
+            with self.subTest(case=label):
+                report, _ = self.collect(replace=replace)
+                self.assertEqual(report['results'], [])
+                self.assertEqual(len(report['errors']), 1)
+
+
 class USFlatResultTests(TestCase):
     def result(self, filename):
         target = next(t for t in TARGETS if t['drf']['url'].endswith(filename))
