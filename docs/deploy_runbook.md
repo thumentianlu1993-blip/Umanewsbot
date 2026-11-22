@@ -1,3 +1,7 @@
+## 2026-11-22 美国目录滞后修复当前生产入口
+
+生产六应用为bdf9c99d，OCI镜像baed84a54959ce18bbfb8abe2284fc022d48648e40439fc720bf4ff435ecf6e1。完整Compose链末项为 `/opt/umanews-external-staging/us-directory-bdf9c99d/release-identity.json`，维护时仍从容器标签读取全链。该私有目录保存1,270,304,177字节完整备份、TOC、旧配置和精确包绑定的业务回滚脚本；包SHA为12e4f27e304a7bffbcf5abeddbe9d90ac4fe1609a4027b88a5b647349e2673a2，回滚目标a601d973。无迁移/业务配置/额度/开关变化，发布锁已释放。美国568/598/602共27条正式结果及公网逐马验收通过；原监测保持。详见[发布实况](changes/us-result-directory-fallback-20261122/release_evidence.md)。
+
 ## 2026-11-22 美国及英国完整修复包维护入口
 
 六应用当前为a601d973，OCI镜像ff646044d79a97593eff2beb9998f91f72e7d7b7b9de1eef14c61623a694d3cc。完整Compose链从运行容器标签读取，末项为 `/opt/umanews-external-staging/race-gaps-full-a601d973-r2/release-identity.json`。该私有目录保存1,267,812,950字节完整备份、TOC、冻结旧配置与绑定包的业务回退脚本。包SHA a26719215c924affe1dcb81635bc9c9118e7b5315589b8c348a1720a97e432b5；无schema/业务配置/额度改变，发布锁已释放。旧内核可能没有memory.peak，读取失败只记peak未知，current与oom/oom_kill仍独立核验。英国14:17前旧发现退避未到期，不将只读身份探针通过称为业务恢复。具体证据、待项及恢复面见[发布实况](changes/race-monitor-gaps-20261122/full_release_evidence.md)。
