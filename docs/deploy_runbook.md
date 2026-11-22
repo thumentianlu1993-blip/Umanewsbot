@@ -1,3 +1,9 @@
+## 2026-11-22 马会杯解析修复发布
+
+生产六应用为 `0c4aca79`，OCI 镜像 `ec34bac64f0da4291ea033643f5499ef9ad6b335211576cde201d43b81d07df5`；浏览器保持 `307c04e968ca69aff4a0c08577609d76911cf9e78687b3d6d4897b4e68c1f642` 且未重启。运行容器完整 Compose 链末项为 `/opt/umanews-external-staging/hkjc-cup-0c4aca79/release-identity.json`，维护时仍从容器标签读取全链。
+
+该私有目录保留 1,279,520,501 字节完整备份、有效 TOC、SHA、旧配置及绑定发布包 `9e99682866c57fe89a2b89bfc833d4bf0d85092aa6d61323c5e06795408a714b` 的回滚脚本。恢复目标为发布前 `e4623dae` 六应用，保留已核实数据及队列；未执行回滚。无迁移、功能开关或额度变化，锁已释放。20:40 原调度恢复马会杯十条正式赛果；六应用、浏览器和原监测检查通过。详见[实际发布记录](changes/hkjc-blank-withdrawal-20261122/release_evidence.md)。以下旧运行版本均为历史。
+
 ## 2026-11-22 英国时间与 NSA PDF 修复当前生产入口
 
 生产六应用为 `e4623dae`，OCI 镜像 `3b3483ea484c38e05913e3a51b3ee2b29ddadc0239cea605e3fc52f018c10f20`；现有 `us_browser` 为 `307c04e968ca69aff4a0c08577609d76911cf9e78687b3d6d4897b4e68c1f642`。完整 Compose 链末项为 `/opt/umanews-external-staging/remaining-e4623dae/release-identity.json`，维护时从运行容器标签读取全链，不依赖宿主 checkout。
