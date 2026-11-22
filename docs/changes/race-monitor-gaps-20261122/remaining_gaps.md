@@ -27,21 +27,21 @@
 
 ## 精确数据恢复候选
 
-运行产物位于本机会话专用 `remaining-gaps/`，尚未执行生产写入。`repair-manifest.json` SHA 为
+准备阶段的运行产物位于本机会话专用 `remaining-gaps/`；下列候选已按用户批准的精确发布包执行，实际结果见[发布实况](remaining_release_evidence.md)。`repair-manifest.json` SHA 为
 `c0025d2fb39e20c1b931c91124be99be8a7e1a161e725a23b92f9a107da2621f`，目标仅 20926、21005，有效期截止 UTC 2026-11-22 20:20（Colonial Cup 已核验计划时间）。
 
 - 21005：复用当前已公开 revision 的 observation 3905，经摘要和时间权限复核后调用新填空逻辑，补伦敦 11 月 21 日 15:00（北京 23:00）。不调用付费 API，不重发赛果。
 - 20926：使用原始 NSA PDF（SHA `8a8f19219230c21ccf9ab9501b9a3f66a265ed2dadff4f312880b3236998029a`，北京时间 09:46 已取得）和目录证据恢复一个九匹“临时出马资料”候选。保留原始采集时刻、403 失败状态、重试时间和全部赛事字段；不新增正式 runners、来源身份、生命周期登记或结果。
 - 生产只读 dry-run 已通过：当前英国公开版本和美国目标/保护时间与清单匹配。实际 apply 前再次复核；先写 fsync 备份，再在一个事务内完成两项。任一检查失败整体回滚。重复执行通过 OperationLog 识别。正式名单、较新候选、人工锁、来源摘要或公开版本变化均停止。
 
-这能补齐英国时间，并恢复 Colonial Cup 已有证据支持的临时展示；不能据此宣称 Colonial Cup 正式名单、临场名单或赛果已经恢复。自动 PDF 传输修复尚待发布实测；正式编号证据仍须另行获得，不能从 overnight PP 推定。
+这能补齐英国时间，并恢复 Colonial Cup 已有证据支持的临时展示；不能据此宣称 Colonial Cup 正式名单、临场名单或赛果已经恢复。自动 PDF 传输修复已发布，发布后自然调度实测仍待原定重试；正式编号证据仍须另行获得，不能从 overnight PP 推定。
 
 ## 验证与交付
 
 - 已取得真实 RED：英国仅跑结果 claim 后，正式赛果可见但时间仍为 None。
 - GREEN 覆盖赛后同值重放补空、不增加 revision、幂等字段审计、未获时间能力时拒绝、人工锁与既有冲突时间保护。
 - 英国工作流/赛前及美国赛前离线回归 24 项通过；新增 PDF 传输 6 项 Python 测试及 6 项 Node 测试通过；运行脚本另以独立测试库检查 dry-run 不写、精确 apply、幂等、失败事务回滚及清单/文件篡改。
-- 当前尚待独立 review、固定提交 CI 和根 AGENTS.md G2；未合并或发布本轮代码，未执行数据恢复清单。
+- 独立 review、固定提交 CI、交付核验及用户 G2/G3 批准已完成，代码与恢复清单已发布；详见[发布实况](remaining_release_evidence.md)。
 
 来源：[NSA 官方目录](https://nationalsteeplechase.com/racing/)、[当前 overnight](https://nationalsteeplechase.com/wp-content/uploads/2026/11/Colonial-Cup-Overnight.pdf)、[主办方节目册说明](https://carolinacup.org/race-program-advertising-colonial/)。
 
@@ -52,4 +52,4 @@
 
 在固定主线 0e45b16d 的断网 PostgreSQL 容器中，只重跑对应的 26 个测试方法，复现相同的 93 条失败/错误，测试标识多重集合完全相同。本次未修改这些测试及其页面/生命周期/迁移实现，未把全量结果记为通过。
 
-本轮另以一次性、逐文件摘要绑定的 remaining-ci-scope.json 明确相关回归：美国和英国自动化、五地区采集对照、共享赛前传输/快照/容量、赛果投影/入库/修复，以及核心和测试选择合同。清单仍需独立审查；不删除测试、不新增 skip，不修改全局高风险规则或旧失败的预期。新增清单只对当前精确基线和字节集合生效，后续 PR 不会继承。
+本轮另以一次性、逐文件摘要绑定的 remaining-ci-scope.json 明确相关回归：美国和英国自动化、五地区采集对照、共享赛前传输/快照/容量、赛果投影/入库/修复，以及核心和测试选择合同。清单已经独立审查，最终相关 CI 1,437 项零跳过通过；不删除测试、不新增 skip，不修改全局高风险规则或旧失败的预期。新增清单只对当前精确基线和字节集合生效，后续 PR 不会继承。
