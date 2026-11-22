@@ -234,13 +234,24 @@ def nsa_target_card(raw,target,*,source_url=''):
         match=re.match(r'^(\d+)(?:st|nd|rd|th) Race\. \(C(X?\d+)\)',line,re.I)
         if not match:continue
         title=re.sub(r'^Purse \$[\d,]+(?: Guaranteed)?\s*','',lines[i+1],flags=re.I)
+        inline = re.search(r'Post Time:\s*\d{1,2}:\d{2}\s*[AP]M\s+(.+)', line, re.I)
+        if inline and not re.fullmatch(r'STAKES|MAIDEN|ALLOWANCE|OVERNIGHT HANDICAP', inline[1], re.I):
+            title = inline[1]
         title=re.split(r'\s*\(Grade |\s+\d+(?:[ /]\d+)* Miles?',title,flags=re.I)[0]
-        if _prerace_name(title)!=_prerace_name(target['race_name']):continue
         book=str(target.get('book_race_id') or target.get('source_race_id') or '').split(':')[0]
+        exact_name = _prerace_name(title) == _prerace_name(target['race_name'])
+        # Exact official alias from the Camden C138 overnight (fixture provenance).
+        # Do not strip arbitrary sponsor/national qualifiers from other races.
+        sponsored = (bool(book) and book == match[2] and target['venue'] == 'CAM'
+                     and _prerace_name(target['race_name']) == 'colonialcup'
+                     and _prerace_name(title) == 'mariondupontscottcolonialcup')
+        if not exact_name and not sponsored:continue
         if book and book!=match[2]:raise ValueError('us_nsa_book_identity')
-        matches.append(int(match[1]))
+        matches.append((int(match[1]), match[2], title))
     if len(matches)!=1:raise ValueError('us_nsa_overnight_identity')
-    value=parse_overnight(raw,local_date=target['local_date'],venue=target['venue'],race_number=matches[0],source_url=source_url)
+    number, book, title = matches[0]
+    value=parse_overnight(raw,local_date=target['local_date'],venue=target['venue'],race_number=number,source_url=source_url)
+    value.update(book_race_id=book, source_race_name=title)
     value['race_name']=target['race_name']
     return value
 

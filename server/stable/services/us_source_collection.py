@@ -176,11 +176,15 @@ def nsa_directory(raw, *, start, end):
             continue
         links = {}
         for a in tr.select('a[href]'):
-            kind = text(a).lower()
+            # NSA adds an accessibility-only new-tab notice inside each anchor.
+            label = a.select_one('.content-text')
+            kind = text(label if label is not None else a).lower()
             if kind in {'entries', 'results'}:
                 target = urljoin(NSA_INDEX, a['href'])
                 if not allowed_url(target):
                     raise ValueError('us_source_url_rejected')
+                if kind in links and links[kind] != target:
+                    raise ValueError('us_nsa_directory_link_conflict')
                 links[kind] = target
         meetings.append(dict(local_date=day.isoformat(), meeting=text(cells[1]), links=links))
     # Explicit links only; never construct a PDF filename.

@@ -82,6 +82,8 @@ def drf_directory(raw):
 def select_chart(target, directory):
     found = [r for r in directory if r['date'] == target['local_date'] and r['track'] == target['venue']
              and race_key(r['name']) == race_key(target['race_name'])]
+    if not found:
+        raise ValueError('not_published')
     if target.get('source_race_id'):
         found = [r for r in found if str(r['race_number']) == target['source_race_id']]
     if len(found) != 1:

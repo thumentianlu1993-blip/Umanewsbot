@@ -122,7 +122,9 @@ class USSteeplechaseTests(TestCase):
         with pdfplumber.open(FIX/case[1]) as pdf:
             lines=[deepcopy(line) for page in pdf.pages for line in page.extract_text_lines(x_tolerance=1.5)]
         for line in lines:line['text']=line['text'].replace('FAR HILLS','CAMDEN').replace('FARHILLS','CAMDEN')
-        document=MagicMock();document.__enter__.return_value=SimpleNamespace(pages=[SimpleNamespace(extract_text_lines=lambda **kw:lines)])
+        page=SimpleNamespace(extract_text_lines=lambda **kw:lines)
+        page.dedupe_chars=lambda **kw:page
+        document=MagicMock();document.__enter__.return_value=SimpleNamespace(pages=[page])
         with patch('stable.services.us_prerace_documents.pdfplumber.open',return_value=document):
             card=docs.parse_overnight(raw,local_date='2026-10-17',venue='CAM',race_number=5,source_url='https://nationalsteeplechase.com/wp-content/uploads/2026/10/camden-synthetic.pdf')
         identity=dict(track='FH',date='2026-10-17',race_number=5)
@@ -576,3 +578,28 @@ class USAnnualNotRunTests(TestCase):
             with self.subTest(changes=changes),self.assertRaises(ValueError):annual_not_run_fields({**event,**changes},calendar,has_results=False)
         with self.assertRaises(ValueError):annual_not_run_fields(event,calendar,has_results=True)
         with self.assertRaises(ValueError):annual_not_run_fields(event,{**calendar,'items':[{**row,'local_date':'2026-12-10'}]},has_results=False)
+
+
+class USMonitorGapTests(TestCase):
+    def test_nsa_accessibility_notice_does_not_hide_entries(self):
+        from datetime import date
+        from stable.services.us_source_collection import nsa_directory
+        raw=(FIX/'nsa-colonial-directory-20261122.html').read_bytes()
+        result=nsa_directory(raw,start=date(2026,11,22),end=date(2026,11,22))
+        self.assertEqual(result['meetings'][0]['links'],{'entries':
+            'https://nationalsteeplechase.com/wp-content/uploads/2026/11/Colonial-Cup-Overnight.pdf'})
+
+    def test_colonial_sponsored_title_keeps_book_identity_and_provisional_numbers(self):
+        from stable.services.us_prerelease_collection import nsa_target_card
+        target=dict(venue='CAM',local_date='2026-11-22',race_name='COLONIAL CUP',source_race_id='138')
+        raw=(FIX/'nsa-colonial-overnight-20261122.pdf').read_bytes()
+        result=nsa_target_card(raw,target)
+        self.assertEqual((result['race_number'],result['declared_count']),(5,9))
+        self.assertEqual(result['book_race_id'],'138')
+        self.assertIn('Marion duPont Scott',result['source_race_name'])
+        self.assertEqual(result['source_stage'],'declared_overnight')
+        self.assertTrue(all(r['number_kind']=='overnight_pp' for r in result['runners']))
+        for changes in [dict(source_race_id='139'),dict(source_race_id=''),
+                        dict(local_date='2026-11-21'),dict(venue='FH'),dict(race_name='AL CUP')]:
+            with self.subTest(changes=changes),self.assertRaises(ValueError):
+                nsa_target_card(raw,{**target,**changes})

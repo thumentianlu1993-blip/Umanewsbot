@@ -1,0 +1,23 @@
+[
+  {
+    "file": "nsa-colonial-directory-20261122.html",
+    "url": "https://nationalsteeplechase.com/racing/",
+    "observed_at": "2026-11-22T01:08:40.271Z",
+    "extraction": "仅保留同场目录表；原始完整快照留在专用runtime",
+    "sha256": "1a5c7fa9a5871b1741810faa803cf6e159b0dfa3c31fb6a4e982023991dd0364"
+  },
+  {
+    "file": "nsa-colonial-overnight-20261122.pdf",
+    "url": "https://nationalsteeplechase.com/wp-content/uploads/2026/11/Colonial-Cup-Overnight.pdf",
+    "extraction": "通过生产宿主只读HTTP取得原始PDF，未调用业务采集；collected_at为本地接收落盘时刻",
+    "sha256": "8a8f19219230c21ccf9ab9501b9a3f66a265ed2dadff4f312880b3236998029a",
+    "collected_at": "2026-11-22T01:46:42.786815+00:00"
+  },
+  {
+    "file": "pebbles-card-20261121.html",
+    "url": "https://www.sportinglife.com/racing/racecards/2026-11-21/belmont-park/racecard/950364/race-9-pebbles-stakes-grade-3",
+    "observed_at": "2026-11-21T17:05:34.136988+00:00",
+    "extraction": "只保留页面NEXT_DATA；赛前旧样本仅作解析回归",
+    "sha256": "0c2db4a75528fec08a3671633c9ea54b19d0a0a833d89d549271cb3e36a4f407"
+  }
+]

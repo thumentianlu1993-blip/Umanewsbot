@@ -111,7 +111,9 @@ def parse_overnight(raw, *, local_date, venue, race_number, source_url=''):
         with pdfplumber.open(BytesIO(raw)) as pdf:
             lines = []
             for page in pdf.pages:
-                lines.extend(page.extract_text_lines(x_tolerance=1.5))
+                # NSA can paint the footer count twice at identical coordinates.
+                # Remove overprinted glyphs, never infer the count from parsed rows.
+                lines.extend(page.dedupe_chars(tolerance=.01).extract_text_lines(x_tolerance=1.5))
     except Exception as exc:
         raise ValueError('us_overnight_pdf') from exc
     if not lines:
