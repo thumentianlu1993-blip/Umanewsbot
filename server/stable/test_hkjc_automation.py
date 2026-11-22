@@ -1,4 +1,5 @@
 """HKJC 真实来源回归；所有输入为离线固定页面。"""
+import gzip
 from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -275,3 +276,94 @@ class HKJCPreviewWorkflowTests(TestCase):
         self.assertEqual(pre_race_days(self.event),45)
         with override_settings(RACE_DATA_SYNC_HKJC_PRE_RACE_ENABLED=False):
             self.assertEqual(pre_race_days(self.event),4)
+
+
+class HKJCBlankWithdrawalTests(SimpleTestCase):
+    url = 'https://racing.hkjc.com/en-us/local/information/localresults?racedate=2026/11/22&Racecourse=ST&RaceNo=9'
+    now = datetime(2026, 11, 22, 12, tzinfo=timezone.utc)
+
+    def setUp(self):
+        from bs4 import BeautifulSoup
+        self.raw = gzip.decompress((ROOT / 'result-blank-withdrawn.html.gz').read_bytes()).decode()
+        self.soup = BeautifulSoup(self.raw, 'html.parser')
+        self.result = next(t for t in self.soup.select('table') if all(v in t.get_text() for v in ['Pla.', 'Horse No.', 'Finish Time']))
+        self.incident = next(t for t in self.soup.select('table') if [c.get_text(' ', strip=True) for c in t.find('tr').find_all(['th', 'td'], recursive=False)] == ['Pla.', 'Horse No.', 'Horse', 'Incident'])
+        self.result_row = next(tr for tr in self.result.select('tr') if 'DOCKLANDS' in tr.get_text())
+        self.incident_row = next(tr for tr in self.incident.select('tr') if 'DOCKLANDS' in tr.get_text())
+
+    def parse(self, page=None):
+        return parse_hkjc_observation(page if page is not None else str(self.soup), url=self.url, route=route(), now=self.now)
+
+    def test_real_cup_blank_placing_uses_same_horse_official_withdrawal(self):
+        import hashlib, json
+        provenance = json.loads((ROOT / 'result-blank-withdrawn.provenance.json').read_text())
+        self.assertEqual(hashlib.sha256(self.raw.encode()).hexdigest(), provenance['sha256'])
+        value = self.parse(self.raw)
+        self.assertTrue(value['roster_complete'])
+        self.assertEqual(value['result_phase'], 'official')
+        self.assertEqual(len(value['roster']), 10)
+        self.assertEqual([x['reported_finish_position'] for x in value['roster'][:9]], list(range(1, 10)))
+        withdrawn = value['roster'][-1]
+        self.assertEqual((withdrawn['number'], withdrawn['external_runner_id'], withdrawn['status']), ('3', 'HK_2024_K902', 'withdrawn'))
+        self.assertEqual(withdrawn['raw_status'], '')
+        self.assertIsNone(withdrawn['reported_finish_position'])
+        proof = withdrawn['field_provenance']['status']
+        self.assertEqual(proof['kind'], 'official_incident_withdrawal')
+        self.assertEqual(proof['source_url'], self.url)
+        self.assertEqual(proof['raw_sha256'], provenance['sha256'])
+        self.assertEqual(proof['withdrawal_date'], '2026-11-21')
+        self.assertIn('Withdrawn on 21.11.26', proof['incident'])
+
+    def test_blank_without_explicit_report_is_not_inferred_from_missing_time(self):
+        self.incident_row.find_all('td', recursive=False)[3].string = 'No report.'
+        with self.assertRaisesMessage(ValueError, 'hkjc_status_unknown'):
+            self.parse()
+
+    def test_report_requires_exact_number_horse_id_name_and_blank_position(self):
+        from bs4 import BeautifulSoup
+        cases = [('number', '2'), ('id', 'HK_2020_E436'), ('name', 'OTHER HORSE'), ('position', '1')]
+        for field, value in cases:
+            with self.subTest(field=field):
+                soup = BeautifulSoup(str(self.soup), 'html.parser')
+                row = next(tr for tr in soup.select('tr') if 'Withdrawn on 21.11.26' in tr.get_text() and len(tr.find_all('td', recursive=False)) == 4)
+                cells = row.find_all('td', recursive=False)
+                if field == 'number': cells[1].string = value
+                elif field == 'position': cells[0].string = value
+                elif field == 'name': cells[2].a.string = value
+                else: cells[2].a['href'] = '/en-us/local/information/horse?horseid=' + value
+                with self.assertRaises(ValueError): self.parse(str(soup))
+
+    def test_duplicate_or_missing_incident_table_rejected(self):
+        from copy import deepcopy
+        for duplicate in [False, True]:
+            with self.subTest(duplicate=duplicate):
+                soup = deepcopy(self.soup)
+                table = next(t for t in soup.select('table') if t.get_text(' ', strip=True).startswith('Pla. Horse No. Horse Incident'))
+                if duplicate: table.insert_after(deepcopy(table))
+                else: table.decompose()
+                with self.assertRaises(ValueError): self.parse(str(soup))
+
+    def test_duplicate_incident_identity_rejected(self):
+        from copy import deepcopy
+        self.incident_row.insert_after(deepcopy(self.incident_row))
+        with self.assertRaises(ValueError): self.parse()
+
+    def test_contradictory_result_time_or_running_position_or_odds_rejected(self):
+        from copy import deepcopy
+        for index, value in [(9, '1 1 1'), (10, '2:00.82'), (11, '6.1')]:
+            with self.subTest(index=index):
+                soup = deepcopy(self.soup)
+                row = next(tr for tr in soup.select('tr') if 'DOCKLANDS' in tr.get_text() and len(tr.find_all('td', recursive=False)) == 12)
+                row.find_all('td', recursive=False)[index].string = value
+                with self.assertRaises(ValueError): self.parse(str(soup))
+
+    def test_future_or_negated_or_other_race_withdrawal_not_accepted(self):
+        for text in ['Not withdrawn on 21.11.26.', 'Withdrawn on 23.11.26 by order of the Stewards acting on veterinary advice (lame).', 'Was withdrawn from another race.', 'A previous withdrawal was noted.',
+                     'Withdrawn on 21.11.26 by order of the Stewards acting on veterinary advice (lame). Subsequently reinstated and allowed to start.']:
+            with self.subTest(text=text):
+                self.incident_row.find_all('td', recursive=False)[3].string = text
+                with self.assertRaises(ValueError): self.parse()
+
+    def test_unknown_nonempty_status_still_rejected(self):
+        self.result_row.find_all('td', recursive=False)[0].string = '???'
+        with self.assertRaisesMessage(ValueError, 'hkjc_status_unknown'): self.parse()

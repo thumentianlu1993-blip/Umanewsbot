@@ -82,6 +82,58 @@ def parse_card(page, *, url, route, now):
         off_time=datetime.combine(day,datetime.strptime(meta[3],'%H:%M').time(),ZoneInfo(route.timezone)).isoformat())
 
 
+def blank_placing_withdrawal_evidence(soup, row, *, day, url, raw_sha256):
+    """仅以同场同马的明确兽医退赛报告解释空白名次，保留原始空值。"""
+    if row['finish_position'] or not row['horse_id'] or any(
+        row.get(field, '') not in ('', '---')
+        for field in ('running_position', 'finish_time', 'margin', 'odds')
+    ):
+        raise ValueError('hkjc_status_unknown')
+    tables = [table for table in soup.select('table') if table.find('tr') and
+              [text(c) for c in table.find('tr').find_all(['td', 'th'], recursive=False)]
+              == ['Pla.', 'Horse No.', 'Horse', 'Incident']]
+    if len(tables) != 1:
+        raise ValueError('hkjc_status_unknown')
+    matches = []
+    for tr in tables[0].select('tr')[1:]:
+        cells = tr.find_all(['td', 'th'], recursive=False)
+        if len(cells) != 4:
+            raise ValueError('hkjc_status_unknown')
+        link = cells[2].find('a', href=True)
+        if not link:
+            raise ValueError('hkjc_status_unknown')
+        target = urlsplit(urljoin(url, link['href']))
+        ids = {k.lower(): v for k, v in parse_qs(target.query).items()}.get('horseid', [])
+        number = text(cells[1])
+        if number != row['horse_number'] and ids != [row['horse_id']]:
+            continue
+        if (number != row['horse_number'] or ids != [row['horse_id']]
+            or text(link).casefold() != row['horse_name_en'].casefold()
+            or target.scheme != 'https' or target.netloc != 'racing.hkjc.com'
+            or target.path != '/en-us/local/information/horse' or text(cells[0])):
+            raise ValueError('hkjc_status_unknown')
+        matches.append(text(cells[3]))
+    if len(matches) != 1:
+        raise ValueError('hkjc_status_unknown')
+    incident = matches[0]
+    match = re.fullmatch(
+        r'^Withdrawn on (\d{2}\.\d{2}\.\d{2}) by order of the Stewards acting on '
+        r'veterinary advice \([^.!?]+\)\.'
+        r'(?: Before being allowed to race again, ' + re.escape(row['horse_name_en']) +
+        r' will be subjected to an official veterinary examination\.)?', incident)
+    if not match:
+        raise ValueError('hkjc_status_unknown')
+    try:
+        withdrawn_on = datetime.strptime(match[1], '%d.%m.%y').date()
+    except ValueError:
+        raise ValueError('hkjc_status_unknown') from None
+    if withdrawn_on > day:
+        raise ValueError('hkjc_status_unknown')
+    return dict(kind='official_incident_withdrawal', source_url=url,
+                raw_sha256=raw_sha256, horse_id=row['horse_id'], number=row['horse_number'],
+                withdrawal_date=withdrawn_on.isoformat(), incident=incident)
+
+
 def result_roster_evidence(soup, rows, *, url, raw_sha256):
     """完整赛果与独立的逐马事件表对账，拒绝只截取前四名或漏掉最后一马。"""
     tables=[]

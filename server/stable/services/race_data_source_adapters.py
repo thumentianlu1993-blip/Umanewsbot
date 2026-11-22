@@ -1459,6 +1459,7 @@ def parse_hkjc_observation(page, *, url, route, now):
     if len(tables) != 1:
         raise ValueError("hkjc_result_partial")
     complete_rows = len(tables[0].select("tr")) - 1 == len(parsed["results"])
+    raw_sha256 = getattr(page, "raw_sha256", hashlib.sha256(str(page).encode()).hexdigest())
     rows = []
     for r in parsed["results"]:
         raw = r["finish_position"]
@@ -1480,6 +1481,12 @@ def parse_hkjc_observation(page, *, url, route, now):
                 "DNF": "did_not_finish",
             }.get(raw, "unknown")
         )
+        status_evidence = None
+        if raw == "":
+            from .hkjc_sources import blank_placing_withdrawal_evidence
+            status_evidence = blank_placing_withdrawal_evidence(
+                soup, r, day=day, url=url, raw_sha256=raw_sha256)
+            status = "withdrawn"
         if status == "unknown":
             raise ValueError("hkjc_status_unknown")
         rows.append(
@@ -1497,7 +1504,8 @@ def parse_hkjc_observation(page, *, url, route, now):
                 finish_time=r["finish_time"] if r["finish_time"] != "---" else "",
                 margin=margin_value(r["margin"]),
                 odds_value=r['odds'] if r['odds'] != '---' else '',
-                field_provenance={'source_url':url, 'field_units':dict(UNITS), 'win_odds':r['odds'], 'raw_margin':r['margin']},
+                field_provenance={'source_url':url, 'field_units':dict(UNITS), 'win_odds':r['odds'], 'raw_margin':r['margin'],
+                                  **({'status': status_evidence} if status_evidence else {})},
             )
         )
     if not rows or len({r["number"] for r in rows}) != len(rows):
