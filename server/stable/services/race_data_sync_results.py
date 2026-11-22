@@ -841,6 +841,8 @@ def apply_data_sync_result_observation(
                         from .uk_pre_race import route_for
                         from .race_data_source_adapters import load_multisource_policy
                         apply_metadata_locked(event=event,metadata=provenance['uk_race_metadata'],route=route_for(event,load_multisource_policy(now=now)),now=now)
+                        from .uk_basic_fields import fill_result_time_locked
+                        fill_result_time_locked(event=event,source=source,observation=observation,now=now,source_class=candidate_source_class)
                     if provenance.get('france_basic_v1'):
                         _apply_france_basic(event, source, observation, candidate_source_class, now)
                     if france_source(source):
@@ -974,6 +976,8 @@ def apply_data_sync_result_observation(
                 from .uk_pre_race import route_for
                 from .race_data_source_adapters import load_multisource_policy
                 apply_metadata_locked(event=event,metadata=provenance['uk_race_metadata'],route=route_for(event,load_multisource_policy(now=now)),now=now)
+                from .uk_basic_fields import fill_result_time_locked
+                fill_result_time_locked(event=event,source=source,observation=observation,now=now,source_class=candidate_source_class)
             if provenance.get('france_basic_v1'):
                 _apply_france_basic(event, source, observation, candidate_source_class, now)
             assert roster_mapping is not None
