@@ -1,3 +1,7 @@
+## 2026-11-22 PR #329发布前置失败与名称独立写入
+
+发布前必须核对前置版本实际验收，PR合并不证明已上线：本次发现PR #328英国身份路径曾因384MiB worker OOM回退，而新包仍继承。应用未切换，维持ceb7737d及完整现行Compose链。已批准两名称用现有命令独立完成，私有备份/收据在 `/opt/umanews-external-staging/race-gap-names-20261122`；原监测未改。恢复边界、manifest和验收见[实际记录](changes/race-monitor-gaps-20261122/release_evidence.md)。
+
 ## 2026-11-22 美国监测缺口诊断入口
 
 `source_parse_failed`可能掩盖美国单场结果收集器拼接的详细错误；先核对DRF当前目录与生产TOBA冻结快照，不重放整年采集。NSA Entries需读取语义标签，当前Colonial Cup为条件册C138/实际第5场，overnight不是最终马号证明。诊断使用独立只读SQL及既有快照，不修改 `/opt/umanews-monitor-20261122`。本次候选尚未发布，定位及恢复边界见[报告](changes/race-monitor-gaps-20261122/report.md)。
