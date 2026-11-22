@@ -1,3 +1,7 @@
+## 2026-11-22 美国及英国完整修复包维护入口
+
+六应用当前为a601d973，OCI镜像ff646044d79a97593eff2beb9998f91f72e7d7b7b9de1eef14c61623a694d3cc。完整Compose链从运行容器标签读取，末项为 `/opt/umanews-external-staging/race-gaps-full-a601d973-r2/release-identity.json`。该私有目录保存1,267,812,950字节完整备份、TOC、冻结旧配置与绑定包的业务回退脚本。包SHA a26719215c924affe1dcb81635bc9c9118e7b5315589b8c348a1720a97e432b5；无schema/业务配置/额度改变，发布锁已释放。旧内核可能没有memory.peak，读取失败只记peak未知，current与oom/oom_kill仍独立核验。英国14:17前旧发现退避未到期，不将只读身份探针通过称为业务恢复。具体证据、待项及恢复面见[发布实况](changes/race-monitor-gaps-20261122/full_release_evidence.md)。
+
 ## 2026-11-22 PR #329发布前置失败与名称独立写入
 
 发布前必须核对前置版本实际验收，PR合并不证明已上线：本次发现PR #328英国身份路径曾因384MiB worker OOM回退，而新包仍继承。应用未切换，维持ceb7737d及完整现行Compose链。已批准两名称用现有命令独立完成，私有备份/收据在 `/opt/umanews-external-staging/race-gap-names-20261122`；原监测未改。恢复边界、manifest和验收见[实际记录](changes/race-monitor-gaps-20261122/release_evidence.md)。
