@@ -44,3 +44,12 @@
 - 当前尚待独立 review、固定提交 CI 和根 AGENTS.md G2；未合并或发布本轮代码，未执行数据恢复清单。
 
 来源：[NSA 官方目录](https://nationalsteeplechase.com/racing/)、[当前 overnight](https://nationalsteeplechase.com/wp-content/uploads/2026/11/Colonial-Cup-Overnight.pdf)、[主办方节目册说明](https://carolinacup.org/race-program-advertising-colonial/)。
+
+
+## 全量失败与主线复现（16:50 北京时间）
+
+固定提交 e63cb807 的 CI 45002036894 执行 7,756 项，8 批报告 93 条失败/错误；其中 80 条属于公开页面探针模块，其余涉及历史马匹履历、旧迁移 schema、公开日历及旧生命周期断言。
+
+在固定主线 0e45b16d 的断网 PostgreSQL 容器中，只重跑对应的 26 个测试方法，复现相同的 93 条失败/错误，测试标识多重集合完全相同。本次未修改这些测试及其页面/生命周期/迁移实现，未把全量结果记为通过。
+
+本轮另以一次性、逐文件摘要绑定的 remaining-ci-scope.json 明确相关回归：美国和英国自动化、五地区采集对照、共享赛前传输/快照/容量、赛果投影/入库/修复，以及核心和测试选择合同。清单仍需独立审查；不删除测试、不新增 skip，不修改全局高风险规则或旧失败的预期。新增清单只对当前精确基线和字节集合生效，后续 PR 不会继承。
