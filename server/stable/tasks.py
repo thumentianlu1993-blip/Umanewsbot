@@ -742,7 +742,11 @@ def cleanup_race_data_sync_artifacts_task() -> dict:
     }
 
 
+from stable.services.race_collection_failures import attempt_scope
+
+
 @shared_task
+@attempt_scope
 def sync_race_event_provider_task(
     event_id: int,
     expected_enrollment_generation: int,

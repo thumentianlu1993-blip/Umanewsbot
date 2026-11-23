@@ -11,6 +11,7 @@ from urllib.parse import urljoin, urlsplit, parse_qs
 from zoneinfo import ZoneInfo
 
 from bs4 import BeautifulSoup
+from .race_collection_failures import attempt_scope, reset_capture, failure_state, delay, ResponseCache
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -180,6 +181,7 @@ def _claim_pre_race_atomic(*, event_id, source, now):
         if france_context:
             state['write_guards'] = france_context.guards
         _save_state(event, source, state)
+        reset_capture()
         return {'event_id': event.pk, 'source': source, 'token': token, 'baseline': baseline(event)}
 
 
@@ -214,12 +216,19 @@ def _finish_locked(event, claim, now, reason='', retry_after=None, outcome_reaso
                 race_datetime=event.race_datetime, local_date=event.local_date, timezone_name=event.timezone_name)
             if due is not None and slot(due)>now:
                 due=slot(due)
-    if reason:
-        failures = min(int(state.get('failures', 0))+1, 8)
-        due = max(now+timedelta(minutes=min(180, 5 * 2**(failures-1))), retry_after or now)
-        state['failures'] = failures
+    if reason or outcome_reason:
+        diagnostic = failure_state(state.get('failure_diagnostic'), reason=reason or outcome_reason, now=now,
+                                   parser_version=claim['source'])
+        state['failure_diagnostic'] = diagnostic
+        failures = min(int(state.get('failures', 0))+1, 8) if diagnostic['fault'] else 0
+        old_floor = timedelta(minutes=min(180, 5 * 2**max(0, failures-1))) if diagnostic['fault'] else timedelta(minutes=5)
+        due = max(due or now, now + old_floor, retry_after or now,
+                  now + delay(reason or outcome_reason, attempts=diagnostic['category_attempts'] if diagnostic['category']=='network' else diagnostic['attempts'], repeated=diagnostic['repeated_content']))
+        state.update(failures=failures, last_checked_at=_iso(now))
     else:
         state.update(last_success_at=_iso(now), last_checked_at=_iso(now), failures=0)
+        if state.get('failure_diagnostic'):
+            state['failure_diagnostic'] = {**state['failure_diagnostic'], 'resolved_at': _iso(now), 'needs_attention': False}
     state.update(next_poll_at=_iso(due), lease_token='', lease_until=None, reason=reason or outcome_reason)
     _save_state(event, claim['source'], state)
 
@@ -667,8 +676,15 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled, binar
                 encoding = declared.group(1).decode('ascii').lower() if declared else 'utf-8'
                 encodings = {'utf-8':'utf-8', 'utf8':'utf-8', 'shift_jis':'cp932',
                              'shift-jis':'cp932', 'sjis':'cp932', 'cp932':'cp932'}
-                if encoding not in encodings: raise JraFetchError('jra_encoding_rejected')
-                html = raw.decode(encodings[encoding])
+                try:
+                    if encoding not in encodings: raise JraFetchError('jra_encoding_rejected')
+                    html = raw.decode(encodings[encoding])
+                except (UnicodeError, JraFetchError):
+                    from .race_collection_failures import capture_document
+                    import base64
+                    capture_document({'bytes_b64': base64.b64encode(raw).decode('ascii')},
+                                     request_key=url, provider=provider, region=region)
+                    raise
                 success = True
                 return {'html': html, 'raw_sha256':hashlib.sha256(raw).hexdigest(), 'observed_at':timezone.now().isoformat()}, 1, 1
         except (requests.RequestException, UnicodeError) as exc:
@@ -703,6 +719,7 @@ def _fetch_bounded_html(url, *, now, provider, region, validator, enabled, binar
     return JraPage(payload['html'], payload['raw_sha256'], _dt(payload.get('observed_at')))
 
 
+@attempt_scope
 def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
     if not jra_enabled(network=True): return {'checked':0,'reason':'disabled'}
     fetcher=fetcher or fetch_jra_html
@@ -712,7 +729,7 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
     events=sorted((e for e in events if in_window(e,now) and not _refs(e).get('pre_race_handoff')),
                   key=lambda e: (_state(e,JRA).get('next_poll_at') or '',e.pk))
     checked=0
-    cache={}
+    cache=ResponseCache(provider=JRA, region="japan_jra")
     attempted = 0
     for event in events:
         if attempted >= settings.RACE_DATA_SYNC_FUTURE_BATCH_SIZE: break
@@ -768,6 +785,8 @@ def discover_jra_pre_race(*, now, fetcher=None, clock=timezone.now):
             if (completed-started).total_seconds() > 90: raise ValueError("jra_work_deadline")
             if complete_jra(claim,html=cache[matches[0]],url=matches[0],now=completed): checked+=1
         except (ValueError, OSError) as exc:
+            from .race_collection_failures import capture_exception
+            capture_exception(exc)
             if str(exc) == 'jra_not_published':
                 finish_pre_race(claim,now=clock(),outcome_reason='not_published')
             else:

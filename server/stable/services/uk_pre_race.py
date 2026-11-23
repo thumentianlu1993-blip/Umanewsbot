@@ -119,6 +119,10 @@ def public_uk_preview(event,*,now):
         stale=bool(pre._state(event,UK).get('reason')))
 
 
+from .race_collection_failures import attempt_scope
+
+
+@attempt_scope
 def discover_uk_pre_race(*,now,policy=None,fetcher=None,clock=timezone.now):
     if not enabled():return {'checked':0,'reason':'disabled'}
     policy=policy or load_multisource_policy(now=now)
@@ -139,6 +143,8 @@ def discover_uk_pre_race(*,now,policy=None,fetcher=None,clock=timezone.now):
                 decision=attach_multisource_observation(source_observation(payload,route=route,now=clock()),policy=policy,now=clock())
                 if decision.action not in {'acquired','attached','replay'}:errors.append({'event_id':event.pk,'reason':decision.reason_code})
         except (ValueError,KeyError,TypeError,OSError) as exc:
+            from .race_collection_failures import capture_exception
+            capture_exception(exc)
             reason=str(exc)[:150];errors.append({'event_id':event.pk,'reason':reason})
             pre.finish_pre_race(claim,now=clock(),reason=reason,retry_after=getattr(exc,'retry_after',None))
     return dict(checked=checked,errors=errors)

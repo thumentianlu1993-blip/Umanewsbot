@@ -72,4 +72,5 @@ def retry_delay(*, priority, reason, now=None):
         return (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0) - now
     if reason in {"access_denied", "http_403", "http_406", "jra_http_403", "jra_http_406"}:
         return timedelta(hours=1)
-    return timedelta(minutes=1 if priority else 5)
+    from .race_collection_failures import delay
+    return max(timedelta(minutes=1 if priority else 5), delay(reason))

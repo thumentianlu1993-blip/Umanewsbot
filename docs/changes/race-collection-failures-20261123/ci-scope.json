@@ -1,0 +1,295 @@
+{
+  "schema_version": 1,
+  "base_sha": "094a926aeb57b5c300dc016d95089523b1b1064f",
+  "reason": "仅为当前精确变更绑定范围：模型增加非权威诊断JSON字段；任务只为既有采集入口包裹有界响应捕获。身份、完整性、来源准入和发布writer不变。覆盖五地区、多来源/旧采集、快照及并发、调度/claim、迁移、公开赛果和新增诊断命令；保留全量入口与未来PR默认规则。",
+  "domains": [
+    "module:stable.test_race_collection_failures",
+    "race_priority_lifecycle",
+    "us_source_collection",
+    "uk_race_automation",
+    "race_results",
+    "race_parser",
+    "japan_race_automation",
+    "hkjc_source_acceptance",
+    "france_race_automation",
+    "module:stable.test_race_pre_race",
+    "module:stable.test_pre_race_refresh",
+    "module:stable.test_pre_race_review_fixes",
+    "module:stable.test_race_data_sync_providers",
+    "module:stable.test_race_data_sync_discovery",
+    "module:stable.test_race_data_sync_r0",
+    "module:stable.test_race_data_sync_pipeline_a",
+    "module:stable.test_race_data_sync_pipeline_a_postgres",
+    "module:stable.test_race_multisource_enrollment",
+    "module:stable.test_race_multisource_coverage",
+    "module:stable.test_race_data_sync_alerts",
+    "infrastructure",
+    "module:stable.test_race_multisource_postgres"
+  ],
+  "changes": [
+    {
+      "path": "docs/changes/hkjc-blank-withdrawal-20261122/release_evidence.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2376a55ef67c52d1c40cf35de60de169cc843c7e77ad80ca272b582713f07517",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-collection-failures-20261123/design.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "55c18fd478afab3d398f0d9c267eaa188b8183961aa20b248532f22fad2cb833",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-collection-failures-20261123/rollout.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "d08f1f08b6873f6425b807e0814a7c69f83777bc341bc3734b6c836671a5e8ea",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-collection-failures-20261123/spec.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "65353626840711f9ba3097b183a17294110175b469be5d4cf8f0f935bb27c3f9",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-collection-failures-20261123/tasks.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "4d372065572f891e8ab4a0038bef39f742775265bb1f7e2c094b7fbaa16d84c2",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/changes/race-collection-failures-20261123/test_cases.md",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "fc6e1593d38498a1248b26f37c6a4750923a6c1fa9b5f287fae95287d327edb6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/current_state.md",
+      "status": "modified",
+      "before_hash": "037ffa6331917446b202b73d81069db240e95d998311a8f79fe2ef3aaff6950f",
+      "after_hash": "2e4fcecd66657f9fa785e353b8c0148288a9e5217e139d1e1d80629ea74a2aca",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "docs/deploy_runbook.md",
+      "status": "modified",
+      "before_hash": "b012dde5630b636ab37b0f42a07a24f544e2c66c2b28f44f332db9ed4e7b815a",
+      "after_hash": "6d67a1d115f03251c64d58f1d887e86e262c2b2edc2f6e58de6b0bddf2cd2729",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/management/commands/inspect_race_collection_failures.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "aca966a218cb1ef37008f47e874ab06233b01a441cb147138e5269ad0ba57716",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/migrations/0089_race_collection_failure_diagnostic.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "2866a4b5b257f5b28a104943f1d02746f70ef5786455f8c1d9509066c4973d76",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/models.py",
+      "status": "modified",
+      "before_hash": "7041d4c2533a5248b7ceb277e19ef0ddda6052b3e5fba5427ca5fc5b2dbf644b",
+      "after_hash": "867f336c9f85bb16ecc45a2aa1abea5a81a4ef2af7f9ea76019196dfe93e7124",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/release_0078_test_fixture.py",
+      "status": "modified",
+      "before_hash": "3e5e43dac8596257597b0a12d13aeb1ea890a768caa5f96926a9bb829c341ff0",
+      "after_hash": "92d6725e22441c87f18aa2ea99a34917eea6ad42b9fa54e3f590191f763ca715",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/france_pre_race.py",
+      "status": "modified",
+      "before_hash": "e1a50c21179a422ddc5604ad4f24946bc367253faa29bcd2065cc185d953404d",
+      "after_hash": "d88db69a8e41f06fad93bf1295607e7585f47e17b4953a5b4f545b98b34fd474",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/hkjc_pre_race.py",
+      "status": "modified",
+      "before_hash": "38404b6843251a5b31ea0e342a3367840c257e8cfa41930497c423b77c90f7f4",
+      "after_hash": "697231102971b8665692d53bfc268cf4ac765fa1e901c76268f184577fcdfde0",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/nar_pre_race.py",
+      "status": "modified",
+      "before_hash": "99db2cd5c34f596733f311df20b3e4a7c3fcc5fa9d68a3641b70bfa9296e32ff",
+      "after_hash": "bf699a9a7a8eb0bd8eba6cc4e50188a73b45e37c58ec3e649e342ab0568121e9",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_collection_failures.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "33078d33ecbc8fcb032aa94dec9d3da7b63f8cd278161f47fa6007e6a19a78c6",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_source_adapters.py",
+      "status": "modified",
+      "before_hash": "75c9a119232e218aeddf459ad63efe50a704a81e84a0557bad61ce652e7e91e7",
+      "after_hash": "5b2fb6ad46e675f5527373b362c37d8e7007de84f763d970c42c6c27aa3b820c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_control.py",
+      "status": "modified",
+      "before_hash": "33aac486e9a2493725cd5136b31cc7ddb5d84b6cc30a1897d17778655f4272ef",
+      "after_hash": "6229869e383dc9ff8d703e83fad586be849ee085c6bafbd873e36fe8aa649bb2",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_enrollment.py",
+      "status": "modified",
+      "before_hash": "27e8090d61b1b02242131c3eb37812667ce455346251e87ca445c675119dbf50",
+      "after_hash": "6cff5c8489708900ec8309e033acbbb8fee9a2547c915bcbdec5dd4e02047396",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_data_sync_providers.py",
+      "status": "modified",
+      "before_hash": "7526930760fb1fc499d9e5caa60fde14e641978dace3e52490ab31c668675bdc",
+      "after_hash": "46378818d763d0691bb7d4331c68c18e82b02e2bd6c5d392d9ea7a3dc15b819c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race.py",
+      "status": "modified",
+      "before_hash": "8c6ab43a8e8dbfca11ef082062d70ea02c2c99327c3fa914fc538d40d67266da",
+      "after_hash": "8931c0a77737ea13d0e87a44204fd8f675aefedf1d7b53026e659a8b68b7447e",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_pre_race_refresh.py",
+      "status": "modified",
+      "before_hash": "8bf804de1250715dd7ed4d98a7f3aaa53a8a78bf3b2c29fe660c4d86281bf567",
+      "after_hash": "f424c89c70099c1d9de8d3419be5c6052a58297f1a119412c51479cf4bcce5ed",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/race_priority.py",
+      "status": "modified",
+      "before_hash": "043bdf222840a8a22ab8c02e9e0730a54b3800632d31a6e9227087860e25fc7c",
+      "after_hash": "78e049fa843208ad733e0df4d81a7d8b50097befe2bff55a457fc121cf67c751",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/uk_pre_race.py",
+      "status": "modified",
+      "before_hash": "f27232459755e71182c8535b59bf69389ef47dbec7a84db1f80916744b832908",
+      "after_hash": "fa77a6afed872a1460634f28e8b81bcdc8af6370d91488b7826914f0c6191508",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/services/us_pre_race.py",
+      "status": "modified",
+      "before_hash": "ba1cb354b8fb0f999c405e9bf991e2525873cf7be0c4efd0fd0349c8e7c68c04",
+      "after_hash": "59b807276acd14163b607fb2364c8c11b3b52896525cafc2e3a79a3900d5c638",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/tasks.py",
+      "status": "modified",
+      "before_hash": "5556b08d1348e23a6baa5aa81545cfa98297fe8016d511b21258440e9699a310",
+      "after_hash": "2f4eee0801b1fa9cea69936b9a2d9535ffa520e77b7560dfe49cb9baf7de4b5c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_collection_failures.py",
+      "status": "added",
+      "before_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_hash": "828cf2279ef273254c9f02687f5b96efbd92ff30ecf50184d54e3046f2f0fa1e",
+      "before_mode": null,
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_discovery.py",
+      "status": "modified",
+      "before_hash": "e155826416767a23a6c401c5e36d5317540474d138afad5e279ab9d4365a4ab4",
+      "after_hash": "b4d067b55b0991c5b024e082d435e169e3896b5dd1ef91b74b65319c4dde3586",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_data_sync_r0.py",
+      "status": "modified",
+      "before_hash": "620167601091c63b703af47bfe3541c1d759167eb313f72b5cff162dc54eda23",
+      "after_hash": "d44a94f74a30e2c7b87a9d2a39423edad6327c7f5c370b98d9b4818c6bd0dc8a",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_multisource_jra.py",
+      "status": "modified",
+      "before_hash": "db2f49b4f96a0c34ead77eb5edc662ceeda2c942a795356019f48e276aeeb67f",
+      "after_hash": "5f788ec3b7d0c66e799b4d932b50f3e03031487ccb60219eea9b27882818fc65",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "server/stable/test_race_priority_lifecycle.py",
+      "status": "modified",
+      "before_hash": "3d49ef164699e468074b11d8341cb591aa071c501a38e11ac9020853a502a3d7",
+      "after_hash": "b223458e8019b2d6d61253530d6b1d63cb96f659cc9fe34bfa7f1c611e6980b5",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/catalog.json",
+      "status": "modified",
+      "before_hash": "704bf1facc89a6920329691f156792eef6cbbf6604f7059d891a949f8e5effb0",
+      "after_hash": "5d5f5a91334107ddcc82d1eb90ecc30fac37bd5eb34bd1e0ce77d3aa3c97728c",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    },
+    {
+      "path": "tools/test_impact/rules.json",
+      "status": "modified",
+      "before_hash": "e59614392bf8c1e64be11aa92b5e99bebf0b19fb4927ebf38d3ca5cf94db93d1",
+      "after_hash": "7a709c45e974c259e281c4799bd36305bb05f3ead4b1753c091dcd85720dae89",
+      "before_mode": "100644",
+      "after_mode": "100644"
+    }
+  ]
+}

@@ -1092,6 +1092,9 @@
     ],
     "module:stable.test_historical_target_reconciliation": [
       "stable.test_historical_target_reconciliation"
+    ],
+    "module:stable.test_race_collection_failures": [
+      "stable.test_race_collection_failures"
     ]
   },
   "dependencies": {
@@ -3413,6 +3416,12 @@
       "domains": [
         "uk_race_automation"
       ]
+    },
+    "server/stable/test_race_collection_failures.py": {
+      "label": "stable.test_race_collection_failures",
+      "domains": [
+        "module:stable.test_race_collection_failures"
+      ]
     }
   },
   "profiles": {
@@ -3785,7 +3794,8 @@
     "stable.test_hkjc_name_catalog": "django",
     "stable.test_race_priority_lifecycle": "django",
     "stable.test_historical_target_reconciliation": "django",
-    "stable.test_uk_identity_recovery": "django"
+    "stable.test_uk_identity_recovery": "django",
+    "stable.test_race_collection_failures": "django"
   },
   "allowed_skips": {
     "stable.test_historical_race_detail_direct_urls.HistoricalRaceDetailDirectUrlTests.test_sporting_life_real_cache_preserves_structured_non_finish_statuses": {

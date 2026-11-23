@@ -103,12 +103,17 @@ def fetch_hkjc_pre_race(*,event,route,now,fetcher):
     return url,page,dict(stage='not_published',items=[],schedule='官方当前入口尚无该场完整名单')
 
 
+from .race_collection_failures import attempt_scope, observe_fetch
+
+
+@attempt_scope
 def discover_hkjc_pre_race(*,now,policy=None,fetcher=None,clock=timezone.now):
     if not enabled():return {'checked':0,'reason':'disabled'}
     policy=policy or load_multisource_policy(now=now)
     if not policy.valid(now):raise ValueError('hkjc_policy_expired')
     fetcher=fetcher or fetch_source_page
     cache={}
+    @observe_fetch
     def cached(url,**kwargs):
         if url not in cache:cache[url]=fetcher(url,**kwargs)
         return cache[url]
@@ -127,6 +132,8 @@ def discover_hkjc_pre_race(*,now,policy=None,fetcher=None,clock=timezone.now):
             url,page,payload=fetch_hkjc_pre_race(event=event,route=route,now=clock(),fetcher=cached)
             checked+=bool(complete(claim,payload=payload,url=url,page=page,route=route,now=clock()))
         except (ValueError,OSError) as exc:
+            from .race_collection_failures import capture_exception
+            capture_exception(exc)
             pre.finish_pre_race(claim,now=clock(),reason=str(exc)[:64],retry_after=getattr(exc,'retry_after',None))
     return dict(checked=checked,attempted=attempted)
 

@@ -2127,6 +2127,10 @@ def recover_legacy_rotated_multisource(*, event_id, policy, now):
         return Decision("rejected", str(exc), event_id)
 
 
+from .race_collection_failures import attempt_scope
+
+
+@attempt_scope
 def discover_multisource_events(*, now, policy=None, fetcher=None):
     from stable.services.race_data_source_adapters import (
         load_multisource_policy,
@@ -2139,6 +2143,7 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
         stage_multisource_policy_incident,
     )
     import secrets
+    from .race_collection_failures import reset_capture, failure_state, delay, safe_code
 
     if (
         not getattr(settings, "RACE_DATA_MULTISOURCE_DISCOVERY_ENABLED", False)
@@ -2234,14 +2239,27 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
             and r.region in settings.RACE_DATA_SYNC_ENABLED_REGIONS
         ]
         routes.sort(key=lambda r: (r.tiebreak_order, r.provider, r.region))
+        all_routes = routes
+        route_diagnostics = {k: v for k, v in state.get('failure_diagnostics', {}).items()
+                             if k in {r.digest for r in policy.routes}}
+        def retry_not_before(route):
+            diagnostic = route_diagnostics.get(route.digest, {})
+            if diagnostic.get('resolved_at') or not diagnostic.get('retry_not_before'):
+                return None
+            try:
+                return aware(diagnostic['retry_not_before'])
+            except (TypeError, ValueError):
+                return None
         offset = state.get("route_cursor", 0) % max(1, len(routes))
-        routes = (routes[offset:] + routes[:offset])[:2]
+        rotated = routes[offset:] + routes[:offset]
+        routes = [r for r in rotated if retry_not_before(r) is None or retry_not_before(r) <= now][:2]
         recovery = recover_legacy_rotated_multisource(event_id=event.pk, policy=policy, now=now)
         results = []
         if recovery.action != "unchanged":
             results.append(dict(reason=recovery.reason_code, action=recovery.action))
             routes = []
         for route in routes:
+            reset_capture()
             try:
                 if not settings.RACE_DATA_SYNC_ALLOW_NETWORK:
                     raise ValueError("network_disabled")
@@ -2251,6 +2269,10 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
                 decision = attach_multisource_observation(
                     value, policy=policy, now=timezone.now(), discovery_token=token
                 )
+                if decision.action not in {'acquired', 'attached', 'replay'}:
+                    raise ValueError(decision.reason_code or 'identity_not_applied')
+                if route.digest in route_diagnostics:
+                    route_diagnostics[route.digest] = {**route_diagnostics[route.digest], 'resolved_at': timezone.now().isoformat(), 'needs_attention': False}
                 results.append(
                     dict(
                         provider=route.provider,
@@ -2258,10 +2280,23 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
                     )
                 )
             except (ValueError, RuntimeError, OSError) as exc:
-                reason = str(exc)
+                from .race_collection_failures import capture_exception
+                capture_exception(exc)
+                reason = safe_code(str(exc))
+                previous = route_diagnostics.get(route.digest, {})
+                failed_at = max(now, timezone.now())
+                diagnostic = failure_state(previous, reason=reason, now=failed_at, parser_version=route.parser_version)
+                supplied_retry = getattr(exc, 'retry_after', None)
+                if not isinstance(supplied_retry, datetime) or timezone.is_naive(supplied_retry):
+                    supplied_retry = failed_at
+                diagnostic['retry_not_before'] = max(supplied_retry, failed_at + delay(reason,
+                    attempts=diagnostic['category_attempts'] if diagnostic['category']=='network' else diagnostic['attempts'],
+                    repeated=diagnostic['repeated_content'])).isoformat()
+                route_diagnostics[route.digest] = diagnostic
                 results.append(
                     dict(
                         provider=route.provider,
+                        failure_diagnostic=diagnostic,
                         reason=(
                             reason
                             if re.fullmatch("[a-z0-9_-]{1,64}", reason)
@@ -2289,10 +2324,15 @@ def discover_multisource_events(*, now, policy=None, fetcher=None):
                         else timedelta(hours=1 if age == -1 else 3)
                     )
                 )
+                next_due = now + interval
+                route_due = [retry_not_before(r) for r in all_routes]
+                if route_due and all(at is not None and at > now for at in route_due):
+                    next_due = max(next_due, min(route_due))
                 current.update(
                     token="",
                     lease_until=None,
-                    next_poll_at=(now + interval).isoformat(),
+                    next_poll_at=next_due.isoformat(),
+                    failure_diagnostics=route_diagnostics,
                     route_cursor=offset + len(routes),
                     last_outcomes=results,
                     last_checked_at=now.isoformat(),

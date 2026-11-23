@@ -326,7 +326,7 @@ class TheRacingApiIdentityDiscoveryConservationTests(TestCase):
 
         outcome, _ = self._discover(transport)
         self.assertFalse(outcome.success)
-        self.assertEqual(outcome.reason_code, "provider_response_invalid")
+        self.assertEqual(outcome.reason_code, "http_503")
         self.assertEqual(len(requests), 2)
         self.assertEqual(outcome.unmatched_event_count, 1)
         self.assertEqual(outcome.deferred_event_count, 1)

@@ -1930,6 +1930,17 @@
     ],
     "docs/changes/hkjc-blank-withdrawal-20261122/ci-scope.json": [
       "infrastructure"
+    ],
+    "docs/changes/race-collection-failures-20261123/ci-scope.json": [
+      "infrastructure"
+    ],
+    "server/stable/services/race_collection_failures.py": [
+      "module:stable.test_race_collection_failures",
+      "race_results",
+      "race_priority_lifecycle"
+    ],
+    "server/stable/management/commands/inspect_race_collection_failures.py": [
+      "module:stable.test_race_collection_failures"
     ]
   },
   "symbols": {
@@ -2185,6 +2196,7 @@
     "docs/changes/uk-identity-recovery-20261122/ci-scope.json",
     "docs/changes/race-monitor-gaps-20261122/ci-scope.json",
     "docs/changes/race-monitor-gaps-20261122/remaining-ci-scope.json",
-    "docs/changes/hkjc-blank-withdrawal-20261122/ci-scope.json"
+    "docs/changes/hkjc-blank-withdrawal-20261122/ci-scope.json",
+    "docs/changes/race-collection-failures-20261123/ci-scope.json"
   ]
 }

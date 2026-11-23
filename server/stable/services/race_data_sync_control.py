@@ -1997,6 +1997,8 @@ def fail_race_data_sync_claim(
         _require_sha(expected_enrollment_entry_sha256, "expected_enrollment_entry_sha256")
         _require_sha(expected_plan_sha256, "expected_plan_sha256")
 
+    from .race_collection_failures import failure_state, retain_evidence, evidence_payload, delay, is_fault
+    evidence = retain_evidence(evidence_payload(), now=now)
     with transaction.atomic():
         event = (
             models.RaceEvent.objects.select_for_update(of=("self",))
@@ -2109,15 +2111,20 @@ def fail_race_data_sync_claim(
                 )
         for checkpoint in checkpoints:
             checkpoint.last_attempt_at = now
-            checkpoint.consecutive_failures += 1
+            diagnostic = failure_state(checkpoint.failure_diagnostic, reason=reason_code, now=now, evidence=evidence)
+            checkpoint.failure_diagnostic = diagnostic
+            checkpoint.consecutive_failures = checkpoint.consecutive_failures + 1 if diagnostic['fault'] else 0
             checkpoint.circuit_reason = reason_code
-            checkpoint.next_poll_at = retry_at
+            checkpoint.next_poll_at = max(retry_at, now + delay(reason_code,
+                attempts=diagnostic['category_attempts'] if diagnostic['category']=='network' else diagnostic['attempts'],
+                repeated=diagnostic['repeated_content']))
             checkpoint.lock_version += 1
             checkpoint.save(
                 update_fields=(
                     "last_attempt_at",
                     "consecutive_failures",
                     "circuit_reason",
+                    "failure_diagnostic",
                     "next_poll_at",
                     "lock_version",
                     "updated_at",
@@ -2131,7 +2138,7 @@ def fail_race_data_sync_claim(
         tracking.active_attempt_token = ""
         tracking.claim_expires_at = None
         tracking.next_poll_at = parent_due
-        tracking.consecutive_failures += 1
+        tracking.consecutive_failures = tracking.consecutive_failures + 1 if is_fault(reason_code) else 0
         tracking.circuit_reason = reason_code
         tracking.lock_version += 1
         tracking.save(
@@ -2273,6 +2280,8 @@ def complete_race_data_sync_claim(
             checkpoint.last_success_at = now
             checkpoint.consecutive_failures = 0
             checkpoint.circuit_reason = ""
+            if checkpoint.failure_diagnostic:
+                checkpoint.failure_diagnostic = {**checkpoint.failure_diagnostic, "resolved_at": now.isoformat(), "needs_attention": False}
             checkpoint.next_poll_at = calculate_next_poll_at(
                         local_date=None if event.status == models.RaceEventStatus.POSTPONED else event.local_date,
                         timezone_name=event.timezone_name,
@@ -2308,6 +2317,7 @@ def complete_race_data_sync_claim(
                     "last_success_at",
                     "consecutive_failures",
                     "circuit_reason",
+                    "failure_diagnostic",
                     "next_poll_at",
                     "last_observation_hash",
                     "last_source_updated_at",
@@ -3009,13 +3019,16 @@ def _validate_multisource_claim(*, claim, now, required_data_kinds=()):
 
 
 def finish_multisource_claim(
-    *, claim, now, success, reason_code="", observation_hashes=None, retry_at=None
+    *, claim, now, success, reason_code="", observation_hashes=None, retry_at=None, parser_version=""
 ):
     """领取者只结束自身来源；失败授权备用来源，成功后才粘滞换源。"""
     from stable.services.race_data_source_adapters import load_multisource_policy
     from stable.services.race_data_sync_admission import validate_multisource_admission
     from stable.services.race_data_sync_enrollment import _multisource_manifest
 
+    from .race_collection_failures import failure_state, retain_evidence, evidence_payload, delay, is_fault, safe_code
+    reason_code = safe_code(reason_code) if not success else ""
+    evidence = retain_evidence(evidence_payload(), now=now) if not success else None
     with transaction.atomic():
         decision, locked = _validate_multisource_claim(claim=claim, now=now)
         if locked is None:
@@ -3036,6 +3049,8 @@ def finish_multisource_claim(
                 checkpoint.last_success_at = now
                 checkpoint.consecutive_failures = 0
                 checkpoint.circuit_reason = ""
+                if checkpoint.failure_diagnostic:
+                    checkpoint.failure_diagnostic = {**checkpoint.failure_diagnostic, "resolved_at": now.isoformat(), "needs_attention": False}
                 checkpoint.last_observation_hash = (observation_hashes or {}).get(
                     checkpoint.data_kind, ""
                 )
@@ -3047,7 +3062,10 @@ def finish_multisource_claim(
                     alternate.pop(checkpoint.data_kind, None)
                     change = True
             else:
-                checkpoint.consecutive_failures += 1
+                diagnostic = failure_state(checkpoint.failure_diagnostic, reason=reason_code, now=now,
+                    parser_version=parser_version, evidence=evidence)
+                checkpoint.failure_diagnostic = diagnostic
+                checkpoint.consecutive_failures = checkpoint.consecutive_failures + 1 if diagnostic["fault"] else 0
                 checkpoint.circuit_reason = reason_code[:64]
                 denied = reason_code in (
                     "access_denied",
@@ -3059,6 +3077,7 @@ def finish_multisource_claim(
                 from .race_priority import needs_priority_result, retry_delay
                 checkpoint.next_poll_at = max(
                     retry_at or now,
+                    now + delay(reason_code, attempts=diagnostic["category_attempts"] if diagnostic["category"]=="network" else diagnostic["attempts"], repeated=diagnostic["repeated_content"]),
                     now + retry_delay(priority=checkpoint.data_kind == "result"
                                       and needs_priority_result(event), reason=reason_code, now=now),
                 )
@@ -3130,7 +3149,7 @@ def finish_multisource_claim(
                         change = True
                         break
             checkpoint.save()
-        tracking.consecutive_failures = 0 if success else tracking.consecutive_failures + 1
+        tracking.consecutive_failures = (tracking.consecutive_failures + 1 if not success and is_fault(reason_code) else 0)
         tracking.active_attempt_token = ""
         tracking.claim_expires_at = None
         tracking.lock_version += 1
