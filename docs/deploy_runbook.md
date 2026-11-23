@@ -1,3 +1,11 @@
+## 2026-11-23 采集失败治理生产入口
+
+六应用运行 `071d920b`，OCI 镜像 `0a520e6337d790b8dbe442d540e862b1b7623b9e217d90a1ea826e563c226ee4`。维护时从容器标签读取完整 Compose 链，末项为 `/opt/umanews-external-staging/collection-failures-071d920b/release-identity.json`；既有浏览器保持原镜像。
+
+该私有目录保存 1,299,033,967 字节完整备份、TOC/SHA、原配置和精确发布包。包 SHA `b9a9f6e3f8bb8c815b247cd648e87e5bd0c9b17ad22e4dadaf4b4f170183ae18`；仅执行 `0089_race_collection_failure_diagnostic`，已核验 JSONB 非空与 `{}` 数据库默认值。原通用迁移入口尚不支持本次 0088 基线，本包使用独立审核且仅允许此一迁移的执行器，不并行执行第二个 DDL 入口。
+
+回滚由本目录 `business_rollback.py` 接收上述包 SHA，恢复 `0c4aca79` 六应用，保留新增列、诊断及业务数据；执行前核验完整配置、候选镜像和兼容 schema。未执行回滚，发布锁已释放。原监测已计划结束，验收要求终态文件和服务状态不变，不重启监测。诊断命令及现场留存边界见[交付说明](changes/race-collection-failures-20261123/rollout.md)，实际验收见[发布实况](changes/race-collection-failures-20261123/release_evidence.md)。以下版本均为历史。
+
 ## 2026-11-22 马会杯解析修复发布
 
 生产六应用为 `0c4aca79`，OCI 镜像 `ec34bac64f0da4291ea033643f5499ef9ad6b335211576cde201d43b81d07df5`；浏览器保持 `307c04e968ca69aff4a0c08577609d76911cf9e78687b3d6d4897b4e68c1f642` 且未重启。运行容器完整 Compose 链末项为 `/opt/umanews-external-staging/hkjc-cup-0c4aca79/release-identity.json`，维护时仍从容器标签读取全链。
